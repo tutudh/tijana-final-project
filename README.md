@@ -10,8 +10,8 @@ linear-programming and dual-price perspective.
 
 ## Contents
 
-- `offline_cost_aware_pac_labeling.tex`: main report source.
-- `offline_cost_aware_pac_labeling.pdf`: compiled report.
+- `main.tex`: main report source.
+- `main.pdf`: compiled report.
 - `audited_online_pac_labeling.tex`: online-auditing source material used in
   the report.
 - `run_simple_offline_pac_experiment.py`: offline calibration experiment with
@@ -48,5 +48,5 @@ The report expects the result plots under `results/simple_offline_pac/` and
 `results/simple_online_pac/`.
 
 ```bash
-latexmk -pdf -interaction=nonstopmode -halt-on-error offline_cost_aware_pac_labeling.tex
+latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
 ```
