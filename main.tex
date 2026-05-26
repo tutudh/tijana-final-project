@@ -625,13 +625,23 @@ Define the counterfactual AI-decision loss
     =
     (1-D_t)\ell\bigl(Y_t,\hatY_t^{(j_t^\star)}\bigr),
 \]
-and the inverse-observation-probability estimate
+where deferral has zero loss because the expert label is used.
+Deferral is an observed zero-loss event, while an unaudited AI decision has
+unobserved loss.  Define the augmented observation mask and its conditional
+observation probability by
 \begin{equation}
-    \widehat H_t
+    O_t=D_t+(1-D_t)A_t,
+    \qquad
+    q_t=D_t+(1-D_t)p_t .
+    \label{eq:online-augmented-mask}
+\end{equation}
+Thus $q_t=1$ when $D_t=1$ and $q_t=p_t$ when $D_t=0$.
+The centered inverse-observation update signal is
+\begin{equation}
+    \widehat Z_t
     =
-    (1-D_t)\frac{A_t}{p_t}
-    \ell\bigl(Y_t,\hatY_t^{(j_t^\star)}\bigr).
-    \label{eq:online-ipw-loss}
+    \frac{O_t}{q_t}\,(H_t-\eps_0).
+    \label{eq:online-centered-signal}
 \end{equation}
 The realized final loss after audit-and-correct is
 \[
@@ -643,7 +653,7 @@ The online price update is
 \begin{equation}
     \lambda_{t+1}
     =
-    [\lambda_t+\eta(\widehat H_t-\eps_0)]_+,
+    [\lambda_t+\eta\widehat Z_t]_+,
     \label{eq:online-price-update}
 \end{equation}
 where $\eta>0$ is a step size and $\eps_0\le\eps$ is an internal error target.
@@ -661,7 +671,7 @@ step size $\eta$; internal target $\eps_0$.
     \State Choose $j_t^\star$ by \eqref{eq:online-source}.
     \If{\eqref{eq:online-defer} holds}
         \State Query the expert, output $\tildeY_t=Y_t$, set $D_t=1$ and
-        $\widehat H_t=0$.
+        $\widehat Z_t=-\eps_0$.
     \Else
         \State Output the AI label $\tildeY_t=\hatY_t^{(j_t^\star)}$ and set
         $D_t=0$.
@@ -669,9 +679,11 @@ step size $\eta$; internal target $\eps_0$.
         $p_t\in[p_{\min},1]$.
         \If{$A_t=1$}
             \State Query the expert, optionally correct $\tildeY_t=Y_t$, and
-            compute $\widehat H_t$ by \eqref{eq:online-ipw-loss}.
+            set
+            $\widehat Z_t=
+            \{\ell(Y_t,\hatY_t^{(j_t^\star)})-\eps_0\}/p_t$.
         \Else
-            \State Set $\widehat H_t=0$.
+            \State Set $\widehat Z_t=0$.
         \EndIf
     \EndIf
     \State Update $\lambda_{t+1}$ by \eqref{eq:online-price-update}.
@@ -685,12 +697,12 @@ The online result is distribution-free with respect to the data sequence; the
 probability is over the algorithm's audit randomness.
 It controls realized error, not cost regret against the offline LP optimum.
 
-\begin{assumption}[Online predictability and audits]
-Before $A_t$ is drawn, the quantities $X_t$, $\hatY_t^{(j)}$, $\hath_{t,j}$,
-$p_t$, $D_t$, and $j_t^\star$ are measurable with respect to the available
-history and the current input.
-Conditional on the post-decision information $\calG_t$,
-$A_t\sim\mathrm{Bernoulli}(p_t)$ with $p_t\in[p_{\min},1]$.
+\begin{assumption}[Predictable routing and random audits]
+The routing decision, audit probability, and selected source are chosen using
+only past information and the current non-expert information
+$(X_t,\{\hatY_t^{(j)},\hath_{t,j},c_{t,j}\}_{j=1}^k,c_{t,E})$.
+After this decision, the audit draw is independent Bernoulli with known
+probability $p_t\in[p_{\min},1]$.
 \end{assumption}
 
 \begin{assumption}[Proxy floor and bounded expert cost]
@@ -701,13 +713,18 @@ For the fixed horizon, let
     \qquad
     c_E^{\max}=\max_{t\le T} c_{t,E}.
 \]
+If future costs are not known in advance, these extrema may be replaced by any
+deterministic lower bound on cheap-source costs and upper bound on expert
+costs that are known before deployment.
 \end{assumption}
 
-\begin{proposition}[Unbiased audited loss estimate]
+\begin{proposition}[Unbiased intermittent update signal]
 \label{prop:online-unbiased}
 Under bounded loss and online predictability,
 \[
-    \E[\widehat H_t\mid\calG_t]=H_t.
+    \E\left[\frac{O_t}{q_t}\,\middle|\,\calG_t\right]=1,
+    \qquad
+    \E[\widehat Z_t\mid\calG_t]=H_t-\eps_0.
 \]
 \end{proposition}
 
@@ -722,7 +739,10 @@ Let
     \qquad
     \Lambda_{\mathrm{on}}
     =
-    \max\left\{\lambda_1,\lambda_{\mathrm{def}}+\frac{\eta}{p_{\min}}\right\}.
+    \max\left\{
+        \lambda_1,
+        \lambda_{\mathrm{def}}+\frac{\eta(1-\eps_0)}{p_{\min}}
+    \right\}.
 \]
 Run Algorithm~\ref{alg:online-audited} with constant step size $\eta>0$ and
 internal target $\eps_0\in[0,\eps]$.
@@ -757,14 +777,13 @@ dataset, then
 Under the conditions of Theorem~\ref{thm:online-audited}, suppose
 \[
     \eps_0
-    =
-    \eps
-    -
+    +
     \frac{\Lambda_{\mathrm{on}}}{\eta T}
-    -
-    \frac{1}{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}},
+    +
+    \frac{1}{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}
+    \le \eps,
 \]
-and the right-hand side is positive.
+with $\eps_0\ge0$.
 Then the audit-and-correct final labels satisfy
 \[
     \frac1T\sum_{t=1}^T G_t\le\eps
@@ -800,13 +819,19 @@ Appendix~\ref{app:experiments} gives the full sweep and implementation
 details.
 
 \paragraph{Offline calibration.}
-The offline experiment compares the finite-policy fixed-price UCB rule from
-Section~2 with the original scalar PAC threshold baseline.
-The baseline is stronger in this single-source setting because it exploits the
-nested monotonicity of uncertainty thresholds, while the fixed-price rule pays
-for uniform certification over a larger candidate class.
-At $\eps=0.10$, both methods have zero violations in 500 trials, with the
-original PAC baseline saving slightly more expert budget.
+The offline experiment compares the fixed-price rule from Section~2 with the
+original scalar PAC threshold baseline.
+Because this experiment has only one cheap source, the fixed-price policies
+are nested uncertainty-threshold rules.
+We therefore certify the fixed-price rule with the sharper monotone confidence
+bound
+\[
+    \hat L_m(\lambda)+\sqrt{\frac{\log(1/\alpha)}{2m}},
+\]
+rather than the finite-class union bound used for general multi-source policy
+classes.
+At $\eps=0.10$, both methods have zero violations in 500 trials and nearly
+identical expert-budget savings.
 
 \begin{table}[H]
 \centering
@@ -815,9 +840,9 @@ original PAC baseline saving slightly more expert budget.
 \toprule
 Dataset & Method & Error & Violation & Budget saved \\
 \midrule
-ImageNet & fixed-price UCB & 0.0793 & 0.0000 & 0.7645 \\
+ImageNet & fixed-price monotone UCB & 0.0873 & 0.0000 & 0.7848 \\
 ImageNet & original PAC & 0.0879 & 0.0000 & 0.7864 \\
-ImageNetV2 & fixed-price UCB & 0.0534 & 0.0000 & 0.4923 \\
+ImageNetV2 & fixed-price monotone UCB & 0.0718 & 0.0000 & 0.5457 \\
 ImageNetV2 & original PAC & 0.0726 & 0.0000 & 0.5479 \\
 \bottomrule
 \end{tabular}
@@ -829,15 +854,19 @@ fraction of items sent to the expert.}
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.95\textwidth]{results/simple_offline_pac/simple_offline_pac_summary.png}
-\caption{Offline sweep over target error levels. The fixed-price UCB rule is
-more conservative than the original scalar PAC baseline in this single-source
-experiment, but both maintain zero empirical violation over 500 trials.}
+\caption{Offline sweep over target error levels. After exploiting the
+single-source monotonicity, the fixed-price rule is nearly indistinguishable
+from the original scalar PAC baseline; the remaining gap comes from using a
+fixed threshold grid rather than the exact calibration-order threshold.}
 \label{fig:offline-main-results}
 \end{figure}
 
 \paragraph{Online audited routing.}
 The online experiment uses a random stream order and the dual-price update in
 Section~3 with audit probabilities $p\in\{0.1,0.2,0.5\}$.
+The update follows the intermittent-feedback form: an unaudited AI decision
+does not move the price, while an expert deferral is treated as an observed
+zero-loss event.
 These runs set the internal online target to $\eps_0=\eps$, so they are a
 behavioral check of the audited update rather than a theorem-tight
 slack-adjusted implementation of Corollary~\ref{cor:online-pac-tuning}.
@@ -854,12 +883,12 @@ $p\ge0.2$.
 \toprule
 Dataset & $p$ & Final error & AI error & Violation & Budget saved \\
 \midrule
-ImageNet & 0.1 & 0.0760 & 0.0844 & 0.0000 & 0.6560 \\
-ImageNet & 0.2 & 0.0725 & 0.0906 & 0.0000 & 0.6076 \\
-ImageNet & 0.5 & 0.0488 & 0.0976 & 0.0000 & 0.3945 \\
-ImageNetV2 & 0.1 & 0.0845 & 0.0939 & 0.0260 & 0.5029 \\
-ImageNetV2 & 0.2 & 0.0774 & 0.0969 & 0.0000 & 0.4645 \\
-ImageNetV2 & 0.5 & 0.0497 & 0.0993 & 0.0000 & 0.3001 \\
+ImageNet & 0.1 & 0.0780 & 0.0866 & 0.0000 & 0.6629 \\
+ImageNet & 0.2 & 0.0737 & 0.0921 & 0.0000 & 0.6115 \\
+ImageNet & 0.5 & 0.0490 & 0.0981 & 0.0000 & 0.3952 \\
+ImageNetV2 & 0.1 & 0.0863 & 0.0958 & 0.0400 & 0.5091 \\
+ImageNetV2 & 0.2 & 0.0783 & 0.0979 & 0.0000 & 0.4681 \\
+ImageNetV2 & 0.5 & 0.0499 & 0.0996 & 0.0000 & 0.3010 \\
 \bottomrule
 \end{tabular}
 \caption{Online audited results at $\eps=0.10$.  ``AI error'' is the
@@ -1031,23 +1060,42 @@ Combining the calibration and deployment events gives probability at least
 $1-\alpha-\delta$. \hfill$\square$
 
 \paragraph{Proof of Proposition 2.}
-If $D_t=1$, then $H_t=0$ and $\widehat H_t=0$.
-If $D_t=0$, then conditional on $\calG_t$ the audit draw is
-Bernoulli$(p_t)$ and the loss
-$\ell(Y_t,\hatY_t^{(j_t^\star)})$ is fixed.
-Therefore
+For the analysis, let $\calG_t$ denote the post-decision sigma-field that
+fixes the selected source, audit probability, deferral decision, and the
+latent selected loss.
+The learner need not observe the latent loss; it is included only so the
+conditional expectation is well defined.
+If $D_t=1$, then $O_t=q_t=1$ and $H_t=0$, so
 \[
-    \E[\widehat H_t\mid\calG_t]
-    =
+    \E\left[\frac{O_t}{q_t}\,\middle|\,\calG_t\right]=1,
+    \qquad
+    \E[\widehat Z_t\mid\calG_t]=-\eps_0=H_t-\eps_0.
+\]
+If $D_t=0$, then $O_t=A_t$, $q_t=p_t$, and conditional on $\calG_t$ the audit
+draw is Bernoulli$(p_t)$ while the loss
+$\ell(Y_t,\hatY_t^{(j_t^\star)})$ is fixed.  Hence
+\[
     \E\left[
-        \frac{A_t}{p_t}
-        \ell(Y_t,\hatY_t^{(j_t^\star)})
-        \,\middle|\,\calG_t
+        \frac{O_t}{q_t}
+        \,\middle|\,
+        \calG_t
     \right]
     =
-    \ell(Y_t,\hatY_t^{(j_t^\star)})
+    \frac{p_t}{p_t}
     =
-    H_t.
+    1.
+\]
+Since $H_t$ and $\eps_0$ are fixed conditional on $\calG_t$, this also gives
+\[
+    \E[\widehat Z_t\mid\calG_t]
+    =
+    \E\left[
+        \frac{O_t}{q_t}(H_t-\eps_0)
+        \,\middle|\,
+        \calG_t
+    \right]
+    =
+    H_t-\eps_0.
 \] \hfill$\square$
 
 \paragraph{Proof of Theorem 2.}
@@ -1063,16 +1111,16 @@ If $\lambda_t\ge\lambda_{\mathrm{def}}$, then for every cheap source $j$,
     c_{t,E}.
 \]
 Thus the algorithm defers to the expert, so $D_t=1$ and
-$\widehat H_t=0$.
+$\widehat Z_t=-\eps_0$.
 Consequently $\lambda_{t+1}=[\lambda_t-\eta\eps_0]_+\le\lambda_t$.
 If instead $\lambda_t<\lambda_{\mathrm{def}}$, then
-$\widehat H_t\le1/p_{\min}$ and hence
+$\widehat Z_t\le(1-\eps_0)/p_{\min}$ and hence
 \[
     \lambda_{t+1}
     \le
-    \lambda_t+\eta/p_{\min}
+    \lambda_t+\eta(1-\eps_0)/p_{\min}
     <
-    \lambda_{\mathrm{def}}+\eta/p_{\min}.
+    \lambda_{\mathrm{def}}+\eta(1-\eps_0)/p_{\min}.
 \]
 By induction, $0\le\lambda_t\le\Lambda_{\mathrm{on}}$ for all $t$.
 
@@ -1080,18 +1128,18 @@ Since $[x]_+\ge x$, the update gives
 \[
     \lambda_{t+1}
     \ge
-    \lambda_t+\eta(\widehat H_t-\eps_0).
+    \lambda_t+\eta\widehat Z_t.
 \]
 Summing over $t=1,\ldots,T$ yields
 \[
-    \sum_{t=1}^T \widehat H_t
+    \sum_{t=1}^T \widehat Z_t
     \le
-    T\eps_0+\frac{\lambda_{T+1}-\lambda_1}{\eta}
+    \frac{\lambda_{T+1}-\lambda_1}{\eta}
     \le
-    T\eps_0+\frac{\Lambda_{\mathrm{on}}}{\eta}.
+    \frac{\Lambda_{\mathrm{on}}}{\eta}.
 \]
 
-Let $M_t=H_t-\widehat H_t$.
+Let $M_t=(H_t-\eps_0)-\widehat Z_t$.
 By Proposition~\ref{prop:online-unbiased}, $M_t$ is a martingale difference
 with respect to the audit filtration.
 Moreover, $|M_t|\le1/p_{\min}$.
@@ -1101,15 +1149,19 @@ Azuma-Hoeffding gives, with probability at least $1-\delta$,
     \le
     \frac{1}{p_{\min}}\sqrt{2T\log(1/\delta)}.
 \]
-Combining the last two displays gives \eqref{eq:online-H-bound}.
+Because
+\[
+    \sum_{t=1}^T H_t
+    =
+    T\eps_0+\sum_{t=1}^T\widehat Z_t+\sum_{t=1}^T M_t,
+\]
+combining the last displays gives \eqref{eq:online-H-bound}.
 Finally, audit-and-correct gives $G_t\le H_t$ pointwise, which proves
 \eqref{eq:online-G-bound}. \hfill$\square$
 
 \paragraph{Proof of Corollary 2.}
-Substitute the stated value of $\eps_0$ into
-\eqref{eq:online-G-bound}.
-The right-hand side becomes exactly $\eps$.
-The positivity condition ensures that the internal target is feasible.
+The stated condition makes the right-hand side of
+\eqref{eq:online-G-bound} at most $\eps$.
 If $\eta\asymp T^{-1/2}$, $p_{\min}$ is constant, and the costs and proxy floor
 are fixed so that $\Lambda_{\mathrm{on}}=O(1)$, then both excess terms in
 \eqref{eq:online-G-bound} are $O(T^{-1/2})$. \hfill$\square$
@@ -1133,14 +1185,22 @@ The scripts are \texttt{run\_simple\_offline\_pac\_experiment.py} and
 For the fixed-price method, the candidate threshold grid contains the
 expert-only rule plus 201 evenly spaced confidence-loss thresholds between
 0 and 1.
+Although Section~\ref{sec:calibration-selection} states the general
+finite-policy bound, this single-source experiment uses the sharper monotone
+threshold radius
+\[
+    \sqrt{\frac{\log(1/\alpha)}{2m}},
+\]
+which is valid uniformly over all scalar thresholds by the same nested-class
+argument used in the original PAC baseline.
 For each trial, the calibration indices are sampled independently and
 uniformly from the target pool with replacement, with calibration size
 $m=0.2T$.
 The confidence level is $\alpha=0.05$ and
 $\eps\in\{0.05,0.10,0.15\}$.
-The original PAC baseline uses the same calibration sample but exploits the
-monotone threshold structure, so its Hoeffding radius does not pay a union
-bound over all candidate thresholds.
+The original PAC baseline uses the same calibration sample and the same
+monotone radius, but chooses its threshold directly from the calibration
+mistake order instead of from the fixed grid.
 
 \begin{table}[t]
 \centering
@@ -1150,15 +1210,15 @@ bound over all candidate thresholds.
 \toprule
 Dataset & Method & $\eps$ & Error & Violation & Budget saved \\
 \midrule
-ImageNet & fixed-price UCB & 0.05 & 0.0290 & 0.0000 & 0.5898 \\
-ImageNet & fixed-price UCB & 0.10 & 0.0793 & 0.0000 & 0.7645 \\
-ImageNet & fixed-price UCB & 0.15 & 0.1290 & 0.0000 & 0.8705 \\
+ImageNet & fixed-price monotone UCB & 0.05 & 0.0372 & 0.0000 & 0.6296 \\
+ImageNet & fixed-price monotone UCB & 0.10 & 0.0873 & 0.0000 & 0.7848 \\
+ImageNet & fixed-price monotone UCB & 0.15 & 0.1372 & 0.0000 & 0.8851 \\
 ImageNet & original PAC & 0.05 & 0.0377 & 0.0000 & 0.6323 \\
 ImageNet & original PAC & 0.10 & 0.0879 & 0.0000 & 0.7864 \\
 ImageNet & original PAC & 0.15 & 0.1380 & 0.0000 & 0.8866 \\
-ImageNetV2 & fixed-price UCB & 0.05 & 0.0019 & 0.0000 & 0.0936 \\
-ImageNetV2 & fixed-price UCB & 0.10 & 0.0534 & 0.0000 & 0.4923 \\
-ImageNetV2 & fixed-price UCB & 0.15 & 0.1036 & 0.0000 & 0.6250 \\
+ImageNetV2 & fixed-price monotone UCB & 0.05 & 0.0218 & 0.0000 & 0.3642 \\
+ImageNetV2 & fixed-price monotone UCB & 0.10 & 0.0718 & 0.0000 & 0.5457 \\
+ImageNetV2 & fixed-price monotone UCB & 0.15 & 0.1219 & 0.0000 & 0.6648 \\
 ImageNetV2 & original PAC & 0.05 & 0.0228 & 0.0000 & 0.3706 \\
 ImageNetV2 & original PAC & 0.10 & 0.0726 & 0.0000 & 0.5479 \\
 ImageNetV2 & original PAC & 0.15 & 0.1228 & 0.0000 & 0.6665 \\
@@ -1179,6 +1239,9 @@ $\lambda_t\max(1-\textnormal{confidence}_t,\rho)<1$ and otherwise defers to
 the expert.
 If the AI prediction is used, it is audited with probability
 $p\in\{0.1,0.2,0.5\}$.
+The hybrid intermittent update is $-\eta\eps_0$ on expert deferrals,
+$\eta(\ell_t-\eps_0)/p$ on audited AI decisions, and zero on unaudited AI
+decisions.
 Audited AI labels are corrected by the expert before release; unaudited AI
 labels are released as-is.
 The reported ``AI error'' is the counterfactual average loss before audit
@@ -1196,24 +1259,24 @@ Corollary~\ref{cor:online-pac-tuning}.
 \toprule
 Dataset & $\eps$ & $p$ & Final error & AI error & Violation & Budget saved \\
 \midrule
-ImageNet & 0.05 & 0.1 & 0.0434 & 0.0482 & 0.0100 & 0.5717 \\
-ImageNet & 0.05 & 0.2 & 0.0394 & 0.0493 & 0.0000 & 0.5235 \\
-ImageNet & 0.05 & 0.5 & 0.0248 & 0.0497 & 0.0000 & 0.3342 \\
-ImageNet & 0.10 & 0.1 & 0.0760 & 0.0844 & 0.0000 & 0.6560 \\
-ImageNet & 0.10 & 0.2 & 0.0725 & 0.0906 & 0.0000 & 0.6076 \\
-ImageNet & 0.10 & 0.5 & 0.0488 & 0.0976 & 0.0000 & 0.3945 \\
-ImageNet & 0.15 & 0.1 & 0.0978 & 0.1086 & 0.0000 & 0.7048 \\
-ImageNet & 0.15 & 0.2 & 0.0950 & 0.1187 & 0.0000 & 0.6552 \\
-ImageNet & 0.15 & 0.5 & 0.0674 & 0.1349 & 0.0000 & 0.4309 \\
-ImageNetV2 & 0.05 & 0.1 & 0.0443 & 0.0492 & 0.1560 & 0.4123 \\
-ImageNetV2 & 0.05 & 0.2 & 0.0394 & 0.0492 & 0.0080 & 0.3748 \\
+ImageNet & 0.05 & 0.1 & 0.0436 & 0.0485 & 0.0100 & 0.5738 \\
+ImageNet & 0.05 & 0.2 & 0.0394 & 0.0493 & 0.0000 & 0.5244 \\
+ImageNet & 0.05 & 0.5 & 0.0249 & 0.0497 & 0.0000 & 0.3344 \\
+ImageNet & 0.10 & 0.1 & 0.0780 & 0.0866 & 0.0000 & 0.6629 \\
+ImageNet & 0.10 & 0.2 & 0.0737 & 0.0921 & 0.0000 & 0.6115 \\
+ImageNet & 0.10 & 0.5 & 0.0490 & 0.0981 & 0.0000 & 0.3952 \\
+ImageNet & 0.15 & 0.1 & 0.1017 & 0.1130 & 0.0000 & 0.7159 \\
+ImageNet & 0.15 & 0.2 & 0.0979 & 0.1223 & 0.0000 & 0.6626 \\
+ImageNet & 0.15 & 0.5 & 0.0683 & 0.1367 & 0.0000 & 0.4330 \\
+ImageNetV2 & 0.05 & 0.1 & 0.0445 & 0.0494 & 0.1840 & 0.4140 \\
+ImageNetV2 & 0.05 & 0.2 & 0.0393 & 0.0491 & 0.0100 & 0.3750 \\
 ImageNetV2 & 0.05 & 0.5 & 0.0244 & 0.0489 & 0.0000 & 0.2372 \\
-ImageNetV2 & 0.10 & 0.1 & 0.0845 & 0.0939 & 0.0260 & 0.5029 \\
-ImageNetV2 & 0.10 & 0.2 & 0.0774 & 0.0969 & 0.0000 & 0.4645 \\
-ImageNetV2 & 0.10 & 0.5 & 0.0497 & 0.0993 & 0.0000 & 0.3001 \\
-ImageNetV2 & 0.15 & 0.1 & 0.1147 & 0.1275 & 0.0000 & 0.5601 \\
-ImageNetV2 & 0.15 & 0.2 & 0.1096 & 0.1371 & 0.0000 & 0.5253 \\
-ImageNetV2 & 0.15 & 0.5 & 0.0734 & 0.1470 & 0.0000 & 0.3451 \\
+ImageNetV2 & 0.10 & 0.1 & 0.0863 & 0.0958 & 0.0400 & 0.5091 \\
+ImageNetV2 & 0.10 & 0.2 & 0.0783 & 0.0979 & 0.0000 & 0.4681 \\
+ImageNetV2 & 0.10 & 0.5 & 0.0499 & 0.0996 & 0.0000 & 0.3010 \\
+ImageNetV2 & 0.15 & 0.1 & 0.1197 & 0.1331 & 0.0000 & 0.5731 \\
+ImageNetV2 & 0.15 & 0.2 & 0.1126 & 0.1407 & 0.0000 & 0.5330 \\
+ImageNetV2 & 0.15 & 0.5 & 0.0739 & 0.1479 & 0.0000 & 0.3465 \\
 \bottomrule
 \end{tabular}%
 }

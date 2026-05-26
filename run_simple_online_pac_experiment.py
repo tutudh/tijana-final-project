@@ -46,6 +46,7 @@ def run_online_trial(
     lam = float(init_lambda)
     sum_h = 0.0
     sum_hhat = 0.0
+    sum_zhat = 0.0
     sum_g = 0.0
     ai_attempts = 0
     audits = 0
@@ -65,10 +66,12 @@ def run_online_trial(
                 expert_queries += 1
                 audit_weight = 1.0 / audit_prob
                 hhat_t = audit_weight * float(is_mistake)
+                zhat_t = audit_weight * (float(is_mistake) - epsilon)
                 g_t = 0.0
             else:
                 released_ai += 1
                 hhat_t = 0.0
+                zhat_t = 0.0
                 g_t = float(is_mistake)
             h_t = float(is_mistake)
         else:
@@ -76,15 +79,17 @@ def run_online_trial(
             expert_queries += 1
             h_t = 0.0
             hhat_t = 0.0
+            zhat_t = -epsilon
             g_t = 0.0
 
         sum_h += h_t
         sum_hhat += hhat_t
+        sum_zhat += zhat_t
         sum_g += g_t
-        lam = max(0.0, lam + eta * (hhat_t - epsilon))
+        lam = max(0.0, lam + eta * zhat_t)
 
     lambda_def = 1.0 / rho
-    lambda_bound = max(float(init_lambda), lambda_def + eta / audit_prob)
+    lambda_bound = max(float(init_lambda), lambda_def + eta * (1.0 - epsilon) / audit_prob)
     theory_bound = (
         epsilon
         + lambda_bound / (eta * n)
@@ -101,6 +106,7 @@ def run_online_trial(
         "theory_h_bound_delta_0.05": theory_bound,
         "counterfactual_ai_error": sum_h / n,
         "ipw_error_estimate": sum_hhat / n,
+        "centered_update_estimate": sum_zhat / n,
         "final_error_after_correction": sum_g / n,
         "ai_attempt_rate": ai_attempts / n,
         "audit_rate": audits / n,
@@ -132,6 +138,7 @@ def summarize_trials(rows):
             q95_final_error=("final_error_after_correction", lambda x: np.quantile(x, 0.95)),
             mean_counterfactual_ai_error=("counterfactual_ai_error", "mean"),
             mean_ipw_error_estimate=("ipw_error_estimate", "mean"),
+            mean_centered_update_estimate=("centered_update_estimate", "mean"),
             mean_budget_saved=("budget_saved", "mean"),
             mean_expert_query_rate=("expert_query_rate", "mean"),
             mean_audit_rate=("audit_rate", "mean"),

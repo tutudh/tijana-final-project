@@ -31,7 +31,7 @@ def evaluate_grid(scores, mistakes, thresholds):
     return losses, saved
 
 
-def select_fixed_price_uniform_ucb(
+def select_fixed_price_monotone_ucb(
     scores,
     mistakes,
     thresholds,
@@ -49,7 +49,10 @@ def select_fixed_price_uniform_ucb(
 
     sample_ai = sample_scores[:, None] <= thresholds[None, :]
     empirical_loss = np.mean(sample_ai & sample_mistakes[:, None], axis=0)
-    radius = np.sqrt(np.log(len(thresholds) / alpha) / (2.0 * m))
+    # In the single-source setting the fixed-price policies are nested
+    # uncertainty-threshold rules, so the one-sided DKW/monotone-threshold
+    # argument removes the union-bound factor over the threshold grid.
+    radius = np.sqrt(np.log(1.0 / alpha) / (2.0 * m))
     ucb = empirical_loss + radius
 
     feasible = np.flatnonzero(ucb <= epsilon)
@@ -59,7 +62,7 @@ def select_fixed_price_uniform_ucb(
         selected = feasible[np.argmax(full_saved[feasible])]
 
     return {
-        "method": "fixed_price_uniform_ucb",
+        "method": "fixed_price_monotone_ucb",
         "m": m,
         "radius": radius,
         "selected_threshold": thresholds[selected],
@@ -154,11 +157,11 @@ def make_plot(summary, out_path):
         "ImageNetV2": "tab:orange",
     }
     method_styles = {
-        "fixed_price_uniform_ucb": ("o", "-"),
+        "fixed_price_monotone_ucb": ("o", "-"),
         "original_pac_hoeffding": ("s", "--"),
     }
     method_labels = {
-        "fixed_price_uniform_ucb": "fixed-price uniform UCB",
+        "fixed_price_monotone_ucb": "fixed-price monotone UCB",
         "original_pac_hoeffding": "original PAC",
     }
 
@@ -253,7 +256,7 @@ def run(args):
                 m = max(1, int(round(args.cal_fraction * n)))
                 sample_idx = rng.integers(0, n, size=m)
                 selected_methods = [
-                    select_fixed_price_uniform_ucb(
+                    select_fixed_price_monotone_ucb(
                         scores=scores,
                         mistakes=mistakes,
                         thresholds=thresholds,
