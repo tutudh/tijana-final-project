@@ -179,81 +179,11 @@ that will later index our candidate routing policies.
 
 \subsection{Lagrangian Dual and Shadow Price}
 
-Introduce one dual variable $\lambda\ge0$ for the average-error constraint and
-one free dual variable $\mu_t\in\R$ for each simplex equality.
-The nonnegativity constraints $x_{t,a}\ge0$ are kept as the domain of the inner
-minimization.
-\begin{center}
-\begin{tabular}{lll}
-\toprule
-Primal constraint & Dual variable & Sign restriction \\
-\midrule
-$\frac1T\sum_{t,a} h_t(a)x_{t,a}\le\eps$
-    & $\lambda$ & $\lambda\ge0$ \\
-$\sum_a x_{t,a}=1$ for item $t$
-    & $\mu_t$ & $\mu_t\in\R$ \\
-$x_{t,a}\ge0$
-    & domain constraint & -- \\
-\bottomrule
-\end{tabular}
-\end{center}
-Using the equality convention $\mu_t(1-\sum_a x_{t,a})$, the Lagrangian is
-\begin{align}
-    \calL(x;\lambda,\mu)
-    =
-    &\frac1T\sum_{t,a} C_t(a)x_{t,a}
-    +\lambda\left(
-        \frac1T\sum_{t,a}h_t(a)x_{t,a}-\eps
-    \right)
-    +\sum_{t=1}^T\mu_t\left(1-\sum_a x_{t,a}\right) \nonumber\\
-    =
-    &\sum_{t,a}
-    \left[
-        \frac1T\{C_t(a)+\lambda h_t(a)\}-\mu_t
-    \right]x_{t,a}
-    +\sum_{t=1}^T\mu_t-\lambda\eps .
-    \label{eq:full-lagrangian}
-\end{align}
-For fixed $(\lambda,\mu)$, the inner problem is
-$\inf_{x\ge0}\calL(x;\lambda,\mu)$.
-Since the Lagrangian is linear in every $x_{t,a}$, this infimum is finite if
-and only if
-\begin{equation}
-    \mu_t
-    \le
-    \frac1T\{C_t(a)+\lambda h_t(a)\},
-    \qquad t\in[T],\; a\in\calA .
-    \label{eq:dual-feasibility-mu}
-\end{equation}
-Otherwise some variable with a negative coefficient can be sent to $+\infty$,
-driving the Lagrangian to $-\infty$.
-When \eqref{eq:dual-feasibility-mu} holds, the $x$ terms vanish at the inner
-minimum and the dual function is
-\[
-    g(\lambda,\mu)=\sum_{t=1}^T\mu_t-\lambda\eps .
-\]
-Thus the explicit dual LP is
-\begin{align}
-    \textnormal{maximize}_{\lambda,\mu}\quad
-    & \sum_{t=1}^T\mu_t-\lambda\eps
-    \label{eq:explicit-mu-dual}\\
-    \textnormal{subject to}\quad
-    & \mu_t
-    \le
-    \frac1T\{C_t(a)+\lambda h_t(a)\},
-    \qquad t\in[T],\; a\in\calA, \nonumber\\
-    & \lambda\ge0,\qquad \mu_t\in\R,\; t\in[T]. \nonumber
-\end{align}
-
-The variables $\mu_t$ can be eliminated analytically.
-For any fixed $\lambda$, the objective is increasing in each $\mu_t$, so the
-optimal value is attained at the largest feasible $\mu_t$:
-\[
-    \mu_t^\star(\lambda)
-    =
-    \frac1T\min_{a\in\calA}\{C_t(a)+\lambda h_t(a)\}.
-\]
-Substitution gives the reduced one-dimensional dual
+The oracle LP has a single global average-error constraint.
+Let $\lambda\ge0$ denote the Lagrange multiplier, or shadow price, of this
+constraint.
+After eliminating the item-wise simplex multipliers, the dual reduces to the
+one-dimensional concave problem
 \begin{equation}
     \max_{\lambda\ge0}
     D(\lambda)
@@ -279,40 +209,37 @@ the dual minimization separates across items, and item $t$ chooses an action in
 The price $\lambda$ is the shadow price of the single average-error
 constraint: small $\lambda$ makes the rule cost-seeking, while large $\lambda$
 makes it error-averse.
+By finite-dimensional LP strong duality, the oracle LP and the reduced dual
+\eqref{eq:dual-problem} have the same optimal value.
+We use this duality only to motivate the fixed-price routing class; the
+deployable method below selects and certifies such policies by calibration.
+Appendix~\ref{app:dual-derivation} gives the explicit Lagrangian derivation.
 
-\begin{proposition}[Dual problem and fixed-price routing]
-\label{prop:dual-price-oracle}
-The Lagrange dual of
-\eqref{eq:oracle-lp-obj}--\eqref{eq:oracle-lp-simplex} is the explicit dual
-\eqref{eq:explicit-mu-dual}, equivalently the reduced dual
-\eqref{eq:dual-problem}.
-Strong duality holds.
-Moreover, for any dual optimal price $\lambda^\star$, any primal optimizer can
-be chosen to put positive mass only on actions attaining the minimum in
-\eqref{eq:true-price-action}.
-If the deterministic fixed-price policy $a_t(\lambda^\star)$ is feasible and
-satisfies complementary slackness,
-\[
-    \lambda^\star\{L_T(a_{1:T}(\lambda^\star))-\eps\}=0,
-\]
-then it is an optimal deterministic solution.
-\end{proposition}
+\textbf{Roadmap.}
+The discussion above is an oracle calculation.
+If the losses $h_t(a)$ were known exactly, then the dual price would give the
+right cost-aware routing rule: choose
+$\lambda^\star\in\argmax_{\lambda\ge0}D(\lambda)$ in the one-dimensional dual,
+and then route each item by minimizing
+$C_t(a)+\lambda^\star h_t(a)$.
+The obstacle is that $h_t(a)$ depends on the true label $Y_t$.
+Thus the very quantity that makes the LP correct is unavailable before expert
+labels are observed.
 
-\begin{lemma}[At most one fractional item]
-\label{lem:one-fractional}
-There exists an extreme-point solution of the oracle LP in which all but at
-most one item $t$ are assigned deterministically.
-Consequently, the gap between the randomized LP and a deterministic policy
-obtained by rounding the one fractional item is at most $1/T$ in average loss
-and at most $\max_{t,a}C_t(a)/T$ in average cost.
-\end{lemma}
+The rest of the paper studies two ways to make this oracle picture
+deployable.
 
-Everything in this section is an oracle calculation: the losses $h_t(a)$ are
-treated as known so that the cost-aware LP and its dual can be written exactly.
-In the deployable problem, the cheap-source losses are precisely the unknown
-quantities.
-The next section replaces $h_t$ by an estimated proxy $\hath_t$ and then uses
-calibration, rather than proxy correctness, to certify the realized error.
+In the \textbf{offline setting}, we use proxy losses $\hath_t$ to generate
+fixed-price policies and reserve a calibration sample with expert labels to
+choose $\lambda$ with a high-probability error certificate.
+The proxy $\hath_t$ is used for efficient routing, while the calibration labels
+provide validity.
+
+In the \textbf{online setting}, labels are revealed only intermittently through
+random audits.
+Whenever the true label is observed, we obtain feedback about the realized
+loss $h_t$ and update the price $\lambda_t$ online through an
+inverse-probability, gradient-descent-like dual update.
 
 \section{Offline PAC Labeling via Calibration}
 \label{sec:offline-certification}
@@ -968,41 +895,86 @@ captures the routing problem.
 \section{Proofs}
 \label{app:proofs}
 
-\paragraph{Proof of Proposition 1.}
-The derivation in Section~\ref{sec:optimization-dual} gives the Lagrangian
-\eqref{eq:full-lagrangian}.
-Taking the infimum over $x_{t,a}\ge0$ yields the dual feasibility constraints
-\eqref{eq:dual-feasibility-mu} and hence the explicit dual
-\eqref{eq:explicit-mu-dual}.
-Eliminating $\mu_t$ gives \eqref{eq:dual-problem}.
+\subsection{Dual Derivation}
+\label{app:dual-derivation}
+
+Introduce one dual variable $\lambda\ge0$ for the average-error constraint and
+one free dual variable $\mu_t\in\R$ for each simplex equality.
+The nonnegativity constraints $x_{t,a}\ge0$ are kept as the domain of the inner
+minimization.
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Primal constraint & Dual variable & Sign restriction \\
+\midrule
+$\frac1T\sum_{t,a} h_t(a)x_{t,a}\le\eps$
+    & $\lambda$ & $\lambda\ge0$ \\
+$\sum_a x_{t,a}=1$ for item $t$
+    & $\mu_t$ & $\mu_t\in\R$ \\
+$x_{t,a}\ge0$
+    & domain constraint & -- \\
+\bottomrule
+\end{tabular}
+\end{center}
+Using the equality convention $\mu_t(1-\sum_a x_{t,a})$, the Lagrangian is
+\begin{align}
+    \calL(x;\lambda,\mu)
+    =
+    &\frac1T\sum_{t,a} C_t(a)x_{t,a}
+    +\lambda\left(
+        \frac1T\sum_{t,a}h_t(a)x_{t,a}-\eps
+    \right)
+    +\sum_{t=1}^T\mu_t\left(1-\sum_a x_{t,a}\right) \nonumber\\
+    =
+    &\sum_{t,a}
+    \left[
+        \frac1T\{C_t(a)+\lambda h_t(a)\}-\mu_t
+    \right]x_{t,a}
+    +\sum_{t=1}^T\mu_t-\lambda\eps .
+    \label{eq:full-lagrangian}
+\end{align}
+For fixed $(\lambda,\mu)$, the inner problem is
+$\inf_{x\ge0}\calL(x;\lambda,\mu)$.
+Since the Lagrangian is linear in every $x_{t,a}$, this infimum is finite if
+and only if
+\begin{equation}
+    \mu_t
+    \le
+    \frac1T\{C_t(a)+\lambda h_t(a)\},
+    \qquad t\in[T],\; a\in\calA .
+    \label{eq:dual-feasibility-mu}
+\end{equation}
+Otherwise some variable with a negative coefficient can be sent to $+\infty$,
+driving the Lagrangian to $-\infty$.
+When \eqref{eq:dual-feasibility-mu} holds, the $x$ terms vanish at the inner
+minimum and the dual function is
+\[
+    g(\lambda,\mu)=\sum_{t=1}^T\mu_t-\lambda\eps .
+\]
+Thus the explicit dual LP is
+\begin{align}
+    \textnormal{maximize}_{\lambda,\mu}\quad
+    & \sum_{t=1}^T\mu_t-\lambda\eps
+    \label{eq:explicit-mu-dual}\\
+    \textnormal{subject to}\quad
+    & \mu_t
+    \le
+    \frac1T\{C_t(a)+\lambda h_t(a)\},
+    \qquad t\in[T],\; a\in\calA, \nonumber\\
+    & \lambda\ge0,\qquad \mu_t\in\R,\; t\in[T]. \nonumber
+\end{align}
+For any fixed $\lambda$, the objective is increasing in each $\mu_t$, so the
+optimal value is attained at
+\[
+    \mu_t^\star(\lambda)
+    =
+    \frac1T\min_{a\in\calA}\{C_t(a)+\lambda h_t(a)\}.
+\]
+Substitution gives the reduced dual \eqref{eq:dual-problem}.
 The primal is feasible because choosing the expert for all items gives zero
 loss, and it is bounded because costs are nonnegative and finite.
 Therefore strong duality holds by finite-dimensional linear programming
 duality.
-For the support statement, complementary slackness for the primal variable
-$x_{t,a}$ implies that $x_{t,a}>0$ only when
-\[
-    \mu_t
-    =
-    \frac1T\{C_t(a)+\lambda h_t(a)\}.
-\]
-At a dual optimum, $\mu_t$ is the minimum feasible upper bound over actions,
-so this equality can hold only for actions minimizing
-$C_t(a)+\lambda h_t(a)$.
-The deterministic optimality claim is then the standard complementary-slackness
-condition for the global risk constraint. \hfill$\square$
-
-\paragraph{Proof of Lemma 1.}
-At an extreme point, the number of positive variables is at most the number of
-linearly independent active equality constraints after converting the active
-global risk constraint, if any, to an equality.
-There are $T$ row-sum constraints and at most one active global risk
-constraint, so an extreme point has at most $T+1$ positive variables.
-Every row $t$ must have at least one positive variable because
-$\sum_a x_{t,a}=1$.
-Thus at most one row can contain more than one positive variable.
-Rounding only that row changes one term in the loss average and one term in the
-cost average, giving the stated bounds. \hfill$\square$
 
 \paragraph{Proof of Theorem 1.}
 For each fixed $\lambda\in\Lambda$, the variables
@@ -1059,7 +1031,7 @@ with conditional probability at least $1-\delta$.
 Combining the calibration and deployment events gives probability at least
 $1-\alpha-\delta$. \hfill$\square$
 
-\paragraph{Proof of Proposition 2.}
+\paragraph{Proof of Proposition 1.}
 For the analysis, let $\calG_t$ denote the post-decision sigma-field that
 fixes the selected source, audit probability, deferral decision, and the
 latent selected loss.
