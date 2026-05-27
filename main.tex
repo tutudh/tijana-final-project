@@ -758,9 +758,12 @@ bound
 rather than the finite-class union bound used for general multi-source policy
 classes.
 At $\eps=0.10$, both methods have zero violations in 500 trials and nearly
-identical expert-budget savings.
+identical expert-budget savings (Table~\ref{tab:offline-main-results}).
+Figure~\ref{fig:offline-main-results} shows the same comparison across all
+three $\eps$ levels, and Table~\ref{tab:offline-full-results} gives the
+corresponding full sweep.
 
-\begin{table}[H]
+\begin{table}[htbp]
 \centering
 \small
 \begin{tabular}{llccc}
@@ -788,6 +791,88 @@ fixed threshold grid rather than the exact calibration-order threshold.}
 \label{fig:offline-main-results}
 \end{figure}
 
+\paragraph{Two-source synthetic routing.}
+The single-source experiment above is the special case in which the LP and
+the original scalar PAC threshold coincide. To stress-test the multi-source
+regime that motivates the LP formulation, we synthesize two complementary
+cheap sources from each base ImageNet table. Items are partitioned by the
+parity of the true class label. On items inside its specialty each source
+reuses the original predictor's label and confidence; on items outside its
+specialty each source emits a uniform-random label and a confidence drawn
+from $\textnormal{Uniform}[0,0.2]$, so the source is calibrated to its own
+competence. Source A's specialty is the even-class half and source B's is
+the odd-class half. Neither source dominates; standalone accuracy is
+approximately $0.39$ on ImageNet and $0.32$ on ImageNetV2, while the per-item
+oracle that picks whichever source is correct attains $0.78$ and $0.65$,
+respectively. Costs match the simple offline experiment: $c_A=c_B=0$,
+$c_E=1$, so the dual rule routes to $\argmin_j \hath_{t,j}$ and defers when
+$\min_j \hath_{t,j} > 1/\lambda$.
+We compare three calibrated policies. \emph{LP two-source uniform UCB} is
+the fixed-price rule of Section~\ref{sec:calibration-selection} applied to
+the constructed two-source pool; it uses the finite-class Hoeffding union
+bound \eqref{eq:hoeffding-ucb} over the same $\lvert\Lambda\rvert=202$
+threshold grid as the simple offline experiment, because the multi-source
+routed loss is no longer monotone in a scalar threshold. \emph{Source-$j$
+monotone PAC} ($j\in\{A,B\}$) is the original PAC baseline restricted to one
+source. \emph{Best-of-singles (Bonferroni)} runs both single-source baselines
+at level $\alpha/2$ and picks the source with the larger empirical savings on
+the calibration sample, which remains a valid $\alpha$-PAC procedure.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{llccc}
+\toprule
+Dataset & Method & Error & Violation & Budget saved \\
+\midrule
+ImageNet   & LP two-source uniform UCB    & 0.0793 & 0.0000 & \textbf{0.7645} \\
+ImageNet   & Best-of-singles (Bonferroni) & 0.0879 & 0.0000 & 0.4746 \\
+ImageNet   & Source A monotone PAC        & 0.0878 & 0.0000 & 0.4715 \\
+ImageNet   & Source B monotone PAC        & 0.0877 & 0.0000 & 0.4754 \\
+ImageNetV2 & LP two-source uniform UCB    & 0.0534 & 0.0000 & \textbf{0.4923} \\
+ImageNetV2 & Best-of-singles (Bonferroni) & 0.0720 & 0.0000 & 0.3587 \\
+ImageNetV2 & Source A monotone PAC        & 0.0727 & 0.0000 & 0.3470 \\
+ImageNetV2 & Source B monotone PAC        & 0.0730 & 0.0000 & 0.3629 \\
+\bottomrule
+\end{tabular}
+\caption{Two-source synthetic routing at $\eps=0.10$. The LP method routes
+each item to the source with the lower proxy loss and certifies the routed
+average error against the union bound over the 202-threshold grid. The
+largest budget saved in each dataset is shown in bold.}
+\label{tab:two-source-main-results}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{results/two_source_offline_pac/two_source_offline_pac_summary.png}
+\caption{Two-source synthetic routing sweep. Each single source can certify
+at most its own specialty half, so the three single-source curves saturate
+near $0.55$ (ImageNet) and $0.45$ (ImageNetV2). The LP method recovers most
+of the per-item oracle envelope by routing across sources at the cost of a
+$\sqrt{\log\lvert\Lambda\rvert}$ uniform-certification radius. On ImageNetV2
+at $\eps=0.05$ that radius approaches $\eps$ itself and the LP method is
+forced into near-full deferral, illustrating where a tighter
+$\sup$-deviation bound would be needed.}
+\label{fig:two-source-main-results}
+\end{figure}
+
+At $\eps=0.10$ all four methods have zero violations in 500 trials. The LP
+rule saves roughly $0.29$ more of the expert budget on ImageNet and $0.13$
+more on ImageNetV2 than the best Bonferroni-corrected single-source baseline
+(Table~\ref{tab:two-source-main-results}).
+The gap on ImageNet is close to the LP oracle's envelope ($0.81$ saved at
+$\eps=0.10$), confirming that the per-item routing benefit dominates the
+finite-policy union-bound radius once the calibration sample is large enough.
+At $\eps=0.05$ on ImageNetV2 the order reverses: with $m=2000$ the uniform
+radius $\sqrt{\log(202/\alpha)/(2m)}\approx 0.046$ leaves almost no headroom
+under $\eps=0.05$, so the LP rule certifies near-zero savings while each
+single-source baseline still certifies its specialty half
+(Figure~\ref{fig:two-source-main-results}; Table~\ref{tab:two-source-full-results}
+in the appendix reports the full sweep). A tighter
+deviation bound (Bernstein, or a $\sup$-deviation argument exploiting the
+unidimensional sufficient statistic $\min_j\hath_{t,j}$) would close this gap;
+we leave that to future work.
+
 \paragraph{Online audited routing.}
 The online experiment uses a random stream order and the dual-price update in
 Section~3 with audit probabilities $p\in\{0.1,0.2,0.5\}$.
@@ -801,9 +886,11 @@ Lower audit rates save more expert budget but leave less correction, so final
 error is closer to the target.
 At $\eps=0.10$, ImageNet has no final-error violations for all three audit
 rates; ImageNetV2 has a small violation rate at $p=0.1$ and none at
-$p\ge0.2$.
+$p\ge0.2$ (Table~\ref{tab:online-main-results}; the full sweep across
+$\eps\in\{0.05,0.10,0.15\}$ is in
+Table~\ref{tab:online-full-results}).
 
-\begin{table}[H]
+\begin{table}[htbp]
 \centering
 \small
 \begin{tabular}{lccccc}
@@ -1150,8 +1237,10 @@ label as the expert.
 The proxy loss is $\hath=1-\textnormal{confidence}$, the cheap-source
 deployment cost is zero, and the expert cost is one.
 All experiments use 500 random trials.
-The scripts are \texttt{run\_simple\_offline\_pac\_experiment.py} and
-\texttt{run\_simple\_online\_pac\_experiment.py}.
+The scripts are
+\texttt{run\_simple\_offline\_\allowbreak pac\_experiment.py},
+\texttt{run\_simple\_online\_\allowbreak pac\_experiment.py}, and
+\texttt{run\_two\_source\_offline\_\allowbreak pac\_experiment.py}.
 
 \paragraph{Offline implementation.}
 For the fixed-price method, the candidate threshold grid contains the
@@ -1172,34 +1261,104 @@ The confidence level is $\alpha=0.05$ and
 $\eps\in\{0.05,0.10,0.15\}$.
 The original PAC baseline uses the same calibration sample and the same
 monotone radius, but chooses its threshold directly from the calibration
-mistake order instead of from the fixed grid.
+mistake order instead of from the fixed grid. The full sweep over
+$\eps\in\{0.05,0.10,0.15\}$ is reported in
+Table~\ref{tab:offline-full-results}.
 
-\begin{table}[t]
+\begin{table}[htbp]
 \centering
 \small
-\resizebox{\textwidth}{!}{%
 \begin{tabular}{llcccc}
 \toprule
 Dataset & Method & $\eps$ & Error & Violation & Budget saved \\
 \midrule
-ImageNet & fixed-price monotone UCB & 0.05 & 0.0372 & 0.0000 & 0.6296 \\
-ImageNet & fixed-price monotone UCB & 0.10 & 0.0873 & 0.0000 & 0.7848 \\
-ImageNet & fixed-price monotone UCB & 0.15 & 0.1372 & 0.0000 & 0.8851 \\
-ImageNet & original PAC & 0.05 & 0.0377 & 0.0000 & 0.6323 \\
-ImageNet & original PAC & 0.10 & 0.0879 & 0.0000 & 0.7864 \\
-ImageNet & original PAC & 0.15 & 0.1380 & 0.0000 & 0.8866 \\
+ImageNet   & fixed-price monotone UCB & 0.05 & 0.0372 & 0.0000 & 0.6296 \\
+ImageNet   & original PAC             & 0.05 & 0.0377 & 0.0000 & 0.6323 \\
+\cmidrule(lr){1-6}
+ImageNet   & fixed-price monotone UCB & 0.10 & 0.0873 & 0.0000 & 0.7848 \\
+ImageNet   & original PAC             & 0.10 & 0.0879 & 0.0000 & 0.7864 \\
+\cmidrule(lr){1-6}
+ImageNet   & fixed-price monotone UCB & 0.15 & 0.1372 & 0.0000 & 0.8851 \\
+ImageNet   & original PAC             & 0.15 & 0.1380 & 0.0000 & 0.8866 \\
+\cmidrule(lr){1-6}
 ImageNetV2 & fixed-price monotone UCB & 0.05 & 0.0218 & 0.0000 & 0.3642 \\
+ImageNetV2 & original PAC             & 0.05 & 0.0228 & 0.0000 & 0.3706 \\
+\cmidrule(lr){1-6}
 ImageNetV2 & fixed-price monotone UCB & 0.10 & 0.0718 & 0.0000 & 0.5457 \\
+ImageNetV2 & original PAC             & 0.10 & 0.0726 & 0.0000 & 0.5479 \\
+\cmidrule(lr){1-6}
 ImageNetV2 & fixed-price monotone UCB & 0.15 & 0.1219 & 0.0000 & 0.6648 \\
-ImageNetV2 & original PAC & 0.05 & 0.0228 & 0.0000 & 0.3706 \\
-ImageNetV2 & original PAC & 0.10 & 0.0726 & 0.0000 & 0.5479 \\
-ImageNetV2 & original PAC & 0.15 & 0.1228 & 0.0000 & 0.6665 \\
+ImageNetV2 & original PAC             & 0.15 & 0.1228 & 0.0000 & 0.6665 \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular}
 \caption{Full offline sweep. Error, violation, and budget saved are averages
-over 500 trials.}
+over 500 trials. Rows are grouped by (dataset, $\eps$) scenario and separated
+by light rules.}
 \label{tab:offline-full-results}
+\end{table}
+
+\paragraph{Two-source implementation.}
+\texttt{run\_two\_source\_offline\_pac\_experiment.py} constructs two
+complementary cheap sources from each base ImageNet table using the
+parity-of-true-class partition described in
+Section~\ref{sec:experiments}. The construction is seeded separately from the
+trial sampler so the synthesized pool is fixed across trials; defaults are
+\texttt{--synth-seed 20260526} and \texttt{--low-conf-max 0.2}. The
+calibration grid contains the expert-only policy plus 201 evenly spaced
+thresholds on $\min_j\hath_{t,j}$, the calibration size is $m=0.2T$, and
+$\alpha=0.05$. The LP method uses the union-bound radius
+$\sqrt{\log(\lvert\Lambda\rvert/\alpha)/(2m)}$; the single-source baselines
+use the monotone radius $\sqrt{\log(1/\alpha)/(2m)}$; the
+Bonferroni-corrected best-of-singles baseline runs both single-source
+baselines at $\alpha/2$ each and reports the one with larger empirical
+savings on the calibration sample. Constructed-pool statistics are written
+to \texttt{results/two\_source\_offline\_pac/two\_source\_offline\_pac\_construction.csv}.
+The full sweep over $\eps\in\{0.05,0.10,0.15\}$ for all four methods is in
+Table~\ref{tab:two-source-full-results}.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{llcccc}
+\toprule
+Dataset & Method & $\eps$ & Error & Violation & Budget saved \\
+\midrule
+ImageNet   & LP two-source uniform UCB    & 0.05 & 0.0290 & 0.0000 & \textbf{0.5898} \\
+ImageNet   & Best-of-singles (Bonferroni) & 0.05 & 0.0372 & 0.0000 & 0.3782 \\
+ImageNet   & Source A monotone PAC        & 0.05 & 0.0378 & 0.0000 & 0.3743 \\
+ImageNet   & Source B monotone PAC        & 0.05 & 0.0378 & 0.0000 & 0.3809 \\
+\cmidrule(lr){1-6}
+ImageNet   & LP two-source uniform UCB    & 0.10 & 0.0793 & 0.0000 & \textbf{0.7645} \\
+ImageNet   & Best-of-singles (Bonferroni) & 0.10 & 0.0879 & 0.0000 & 0.4746 \\
+ImageNet   & Source A monotone PAC        & 0.10 & 0.0878 & 0.0000 & 0.4715 \\
+ImageNet   & Source B monotone PAC        & 0.10 & 0.0877 & 0.0000 & 0.4754 \\
+\cmidrule(lr){1-6}
+ImageNet   & LP two-source uniform UCB    & 0.15 & 0.1290 & 0.0000 & \textbf{0.8705} \\
+ImageNet   & Best-of-singles (Bonferroni) & 0.15 & 0.1383 & 0.0000 & 0.5296 \\
+ImageNet   & Source A monotone PAC        & 0.15 & 0.1377 & 0.0000 & 0.5273 \\
+ImageNet   & Source B monotone PAC        & 0.15 & 0.1379 & 0.0000 & 0.5299 \\
+\cmidrule(lr){1-6}
+ImageNetV2 & LP two-source uniform UCB    & 0.05 & 0.0019 & 0.0000 & 0.0936 \\
+ImageNetV2 & Best-of-singles (Bonferroni) & 0.05 & 0.0210 & 0.0000 & 0.2331 \\
+ImageNetV2 & Source A monotone PAC        & 0.05 & 0.0227 & 0.0000 & 0.2254 \\
+ImageNetV2 & Source B monotone PAC        & 0.05 & 0.0230 & 0.0000 & \textbf{0.2424} \\
+\cmidrule(lr){1-6}
+ImageNetV2 & LP two-source uniform UCB    & 0.10 & 0.0534 & 0.0000 & \textbf{0.4923} \\
+ImageNetV2 & Best-of-singles (Bonferroni) & 0.10 & 0.0720 & 0.0000 & 0.3587 \\
+ImageNetV2 & Source A monotone PAC        & 0.10 & 0.0727 & 0.0000 & 0.3470 \\
+ImageNetV2 & Source B monotone PAC        & 0.10 & 0.0730 & 0.0000 & 0.3629 \\
+\cmidrule(lr){1-6}
+ImageNetV2 & LP two-source uniform UCB    & 0.15 & 0.1036 & 0.0000 & \textbf{0.6250} \\
+ImageNetV2 & Best-of-singles (Bonferroni) & 0.15 & 0.1226 & 0.0000 & 0.4389 \\
+ImageNetV2 & Source A monotone PAC        & 0.15 & 0.1234 & 0.0000 & 0.4287 \\
+ImageNetV2 & Source B monotone PAC        & 0.15 & 0.1226 & 0.0000 & 0.4412 \\
+\bottomrule
+\end{tabular}
+\caption{Full two-source sweep. Error, violation, and budget saved are
+averages over 500 trials of calibration sampling. Rows are grouped by
+(dataset, $\eps$) scenario and separated by light rules; the largest budget
+saved in each scenario is shown in bold.}
+\label{tab:two-source-full-results}
 \end{table}
 
 \paragraph{Online implementation.}
@@ -1221,39 +1380,45 @@ correction, and the reported final error is the realized loss after
 correction.
 As noted in Section~\ref{sec:experiments}, these runs set $\eps_0=\eps$
 rather than subtracting the finite-horizon slack from
-Corollary~\ref{cor:online-pac-tuning}.
+Corollary~\ref{cor:online-pac-tuning}. The full sweep over
+$\eps\in\{0.05,0.10,0.15\}$ and $p\in\{0.1,0.2,0.5\}$ is reported in
+Table~\ref{tab:online-full-results}.
 
-\begin{table}[t]
+\begin{table}[htbp]
 \centering
 \small
-\resizebox{\textwidth}{!}{%
 \begin{tabular}{lcccccc}
 \toprule
 Dataset & $\eps$ & $p$ & Final error & AI error & Violation & Budget saved \\
 \midrule
-ImageNet & 0.05 & 0.1 & 0.0436 & 0.0485 & 0.0100 & 0.5738 \\
-ImageNet & 0.05 & 0.2 & 0.0394 & 0.0493 & 0.0000 & 0.5244 \\
-ImageNet & 0.05 & 0.5 & 0.0249 & 0.0497 & 0.0000 & 0.3344 \\
-ImageNet & 0.10 & 0.1 & 0.0780 & 0.0866 & 0.0000 & 0.6629 \\
-ImageNet & 0.10 & 0.2 & 0.0737 & 0.0921 & 0.0000 & 0.6115 \\
-ImageNet & 0.10 & 0.5 & 0.0490 & 0.0981 & 0.0000 & 0.3952 \\
-ImageNet & 0.15 & 0.1 & 0.1017 & 0.1130 & 0.0000 & 0.7159 \\
-ImageNet & 0.15 & 0.2 & 0.0979 & 0.1223 & 0.0000 & 0.6626 \\
-ImageNet & 0.15 & 0.5 & 0.0683 & 0.1367 & 0.0000 & 0.4330 \\
+ImageNet   & 0.05 & 0.1 & 0.0436 & 0.0485 & 0.0100 & 0.5738 \\
+ImageNet   & 0.05 & 0.2 & 0.0394 & 0.0493 & 0.0000 & 0.5244 \\
+ImageNet   & 0.05 & 0.5 & 0.0249 & 0.0497 & 0.0000 & 0.3344 \\
+\cmidrule(lr){1-7}
+ImageNet   & 0.10 & 0.1 & 0.0780 & 0.0866 & 0.0000 & 0.6629 \\
+ImageNet   & 0.10 & 0.2 & 0.0737 & 0.0921 & 0.0000 & 0.6115 \\
+ImageNet   & 0.10 & 0.5 & 0.0490 & 0.0981 & 0.0000 & 0.3952 \\
+\cmidrule(lr){1-7}
+ImageNet   & 0.15 & 0.1 & 0.1017 & 0.1130 & 0.0000 & 0.7159 \\
+ImageNet   & 0.15 & 0.2 & 0.0979 & 0.1223 & 0.0000 & 0.6626 \\
+ImageNet   & 0.15 & 0.5 & 0.0683 & 0.1367 & 0.0000 & 0.4330 \\
+\cmidrule(lr){1-7}
 ImageNetV2 & 0.05 & 0.1 & 0.0445 & 0.0494 & 0.1840 & 0.4140 \\
 ImageNetV2 & 0.05 & 0.2 & 0.0393 & 0.0491 & 0.0100 & 0.3750 \\
 ImageNetV2 & 0.05 & 0.5 & 0.0244 & 0.0489 & 0.0000 & 0.2372 \\
+\cmidrule(lr){1-7}
 ImageNetV2 & 0.10 & 0.1 & 0.0863 & 0.0958 & 0.0400 & 0.5091 \\
 ImageNetV2 & 0.10 & 0.2 & 0.0783 & 0.0979 & 0.0000 & 0.4681 \\
 ImageNetV2 & 0.10 & 0.5 & 0.0499 & 0.0996 & 0.0000 & 0.3010 \\
+\cmidrule(lr){1-7}
 ImageNetV2 & 0.15 & 0.1 & 0.1197 & 0.1331 & 0.0000 & 0.5731 \\
 ImageNetV2 & 0.15 & 0.2 & 0.1126 & 0.1407 & 0.0000 & 0.5330 \\
 ImageNetV2 & 0.15 & 0.5 & 0.0739 & 0.1479 & 0.0000 & 0.3465 \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular}
 \caption{Full online sweep. Final error, AI error, and budget saved are
-averages over 500 trials.}
+averages over 500 trials. Rows are grouped by (dataset, $\eps$) scenario and
+separated by light rules.}
 \label{tab:online-full-results}
 \end{table}
 

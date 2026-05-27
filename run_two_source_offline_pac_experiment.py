@@ -420,7 +420,7 @@ def run(args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--trials", type=int, default=200)
+    parser.add_argument("--trials", type=int, default=500)
     parser.add_argument("--seed", type=int, default=357)
     parser.add_argument("--synth-seed", type=int, default=20260526)
     parser.add_argument("--alpha", type=float, default=0.05)
