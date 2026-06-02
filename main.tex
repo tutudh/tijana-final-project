@@ -20,6 +20,9 @@
     urlcolor=blue
 }
 
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5\baselineskip}
+
 \newtheorem{theorem}{Theorem}
 \newtheorem{proposition}{Proposition}
 \newtheorem{corollary}{Corollary}
@@ -33,7 +36,6 @@
 \newcommand{\Pp}{\mathbb{P}}
 \newcommand{\ind}[1]{\mathbf{1}\{#1\}}
 \newcommand{\calD}{\mathcal{D}}
-\newcommand{\calT}{\mathcal{T}}
 \newcommand{\calA}{\mathcal{A}}
 \newcommand{\calL}{\mathcal{L}}
 \newcommand{\calG}{\mathcal{G}}
@@ -51,7 +53,7 @@
 \newcommand{\argmin}{\operatorname*{arg\,min}}
 \newcommand{\argmax}{\operatorname*{arg\,max}}
 
-\title{Cost-Aware PAC Labeling from a Linear-Programming Perspective}
+\title{Online PAC Labeling from a Linear Programming Perspective}
 \author{STATS 357 Project}
 \date{\today}
 
@@ -79,38 +81,31 @@ produce inverse-probability feedback for updating the dual price and
 controlling finite-horizon realized error.
 \end{abstract}
 
-\section{A Linear-Programming View of Cost-Aware PAC Labeling}
+\section{Problem Setup and LP Formulation}
 \label{sec:optimization-dual}
 
 \subsection{Setup and Notation}
 
 We preserve the online notation $t=1,\ldots,T$ so that the offline and online
 formulations remain compatible.
-There is a fixed target pool
-\[
-    \calT = \{X_t\}_{t=1}^T,
-\]
-whose true labels $Y_1,\ldots,Y_T$ are initially unknown.
-For each item $t$ and each cheap source $j\in[k]$, we observe a predicted label
-\[
-    \hatY_t^{(j)}
-\]
-and a known query cost $c_{t,j}\ge 0$.
-The expert label $Y_t$ is treated as correct and costs $c_{t,E}>0$.
-The loss is bounded:
+There is a fixed pool of unlabeled items $X_1,\ldots,X_T$,
+whose true labels $Y_1,\ldots,Y_T$ are initially unknown, and the goal is to labeling the items correctly while minimizing labeling cost.
+
+For each item $t$, we have access to $k$ cheap ML models, which produce predicted labels
+\(\hatY_t^{(j)}\). Also, the expert label $Y_t$ is treated as correct but incurs an expansive query cost $c_{t,E}>0$. In this project, we assume ML models are much cheaper than the expert, so we set $c_{t,j}=0$ for all $t$ and $j\in[k]$ and $c_{t,E}=1$.
+The labeling loss is bounded:
 \begin{equation}
     0 \le \ell\bigl(Y_t,\hatY_t^{(j)}\bigr) \le 1,
     \qquad t\in[T],\; j\in[k].
     \label{eq:bounded-loss}
 \end{equation}
 The expert action has zero labeling loss.
-
 Define the action set
 \[
     \calA = \{E,1,\ldots,k\},
 \]
 where $E$ denotes deferral to the expert.
-For $a\in\calA$, define the itemwise loss and cost
+For $a\in\calA$, define the loss and cost for item $t$ by
 \begin{equation}
     h_t(a)
     =
@@ -119,11 +114,11 @@ For $a\in\calA$, define the itemwise loss and cost
         \ell\bigl(Y_t,\hatY_t^{(a)}\bigr), & a\in[k],
     \end{cases}
     \qquad
-    C_t(a)
+    c_t(a)
     =
     \begin{cases}
-        c_{t,E}, & a=E,\\
-        c_{t,a}, & a\in[k].
+        1, & a=E,\\
+        0, & a\in[k].
     \end{cases}
     \label{eq:itemwise-loss-cost}
 \end{equation}
@@ -141,49 +136,37 @@ The finite-pool average labeling error and average cost are
 \begin{equation}
     L_T(a_{1:T}) = \frac1T\sum_{t=1}^T h_t(a_t),
     \qquad
-    C_T(a_{1:T}) = \frac1T\sum_{t=1}^T C_t(a_t).
+    C_T(a_{1:T}) = \frac1T\sum_{t=1}^T c_t(a_t).
     \label{eq:finite-pool-risk-cost}
 \end{equation}
-The offline target is
-\begin{equation}
-    \min_{a_1,\ldots,a_T\in\calA} C_T(a_{1:T})
-    \qquad
-    \textnormal{subject to}
-    \qquad
-    L_T(a_{1:T}) \le \eps.
-    \label{eq:pac-target}
-\end{equation}
 
-\subsection{The Oracle Cost-Aware Labeling LP}
+\subsection{The Cost-Aware Labeling LP}
 
-The deterministic problem in \eqref{eq:pac-target} is the cost-aware labeling
-problem we would like to solve.
-To expose the pricing structure, first consider its randomized LP relaxation.
+We formulate the cost-aware PAC labeling problem as a linear program.
 Let $x_{t,a}$ be the probability of choosing action $a$ on item $t$.
-If the true losses $h_t(a)$ were known for all target items and all actions,
-the oracle policy would solve
-\begin{align}
+If the true losses $h_t(a)$ were known,
+the optimal labeling policy would be the solution to the following LP:
+\begin{equation}
+\label{eq:oracle-lp}
+\begin{aligned}
     \textnormal{minimize}_{x}\quad
-    & \frac1T\sum_{t=1}^T\sum_{a\in\calA} C_t(a)x_{t,a}
-    \label{eq:oracle-lp-obj}\\
+    & \frac1T\sum_{t=1}^T\sum_{a\in\calA} c_t(a)x_{t,a}
+    \\
     \textnormal{subject to}\quad
     & \frac1T\sum_{t=1}^T\sum_{a\in\calA} h_t(a)x_{t,a} \le \eps,
-    \label{eq:oracle-lp-risk}\\
-    & \sum_{a\in\calA}x_{t,a}=1,\qquad t=1,\ldots,T,
-    \label{eq:oracle-lp-simplex}\\
-    & x_{t,a}\ge0,\qquad t\in[T],\; a\in\calA. \nonumber
-\end{align}
-The integer formulation is recovered by requiring $x_{t,a}\in\{0,1\}$.
-The LP relaxation is useful because its dual reveals the one-dimensional price
-that will later index our candidate routing policies.
+    \\
+    & \sum_{a\in\calA}x_{t,a}=1,\qquad t\in[T],
+    \\
+    & x_{t,a}\ge0,\qquad t\in[T],\; a\in\calA.
+\end{aligned}
+\end{equation}
+Intuitively, the LP minimizes labeling cost subject to an average-error constraint.
 
 \subsection{Lagrangian Dual and Shadow Price}
 
-The oracle LP has a single global average-error constraint.
-Let $\lambda\ge0$ denote the Lagrange multiplier, or shadow price, of this
-constraint.
-After eliminating the item-wise simplex multipliers, the dual reduces to the
-one-dimensional concave problem
+The oracle LP \eqref{eq:oracle-lp} has a single global average-error constraint.
+Let $\lambda\ge0$ denote the Lagrange multiplier, or shadow price, of the labeling error constraint.
+The dual problem is the one-dimensional concave maximization problem (See Appendix \ref{app:dual-derivation} for details):
 \begin{equation}
     \max_{\lambda\ge0}
     D(\lambda)
@@ -191,55 +174,32 @@ one-dimensional concave problem
     -\lambda\eps
     +
     \frac1T\sum_{t=1}^T
-    \min_{a\in\calA}\{C_t(a)+\lambda h_t(a)\}.
+    \min_{a\in\calA}\{c_t(a)+\lambda h_t(a)\}.
     \label{eq:dual-problem}
 \end{equation}
-The function $D(\lambda)$ is concave because it is a sum of pointwise minima of
-affine functions of $\lambda$, minus a linear term.
-
 This is the source of the fixed-price rule: once a price $\lambda$ is fixed,
-the dual minimization separates across items, and item $t$ chooses an action in
+the dual minimization separates across items, and the action for item $t$ is given by the following rule:
 \begin{equation}
     a_t(\lambda)
     \in
     \argmin_{a\in\calA}
-    \{C_t(a)+\lambda h_t(a)\}.
+    \{c_t(a)+\lambda h_t(a)\}.
     \label{eq:true-price-action}
 \end{equation}
-The price $\lambda$ is the shadow price of the single average-error
-constraint: small $\lambda$ makes the rule cost-seeking, while large $\lambda$
-makes it error-averse.
-By finite-dimensional LP strong duality, the oracle LP and the reduced dual
-\eqref{eq:dual-problem} have the same optimal value.
-We use this duality only to motivate the fixed-price routing class; the
-deployable method below selects and certifies such policies by calibration.
-Appendix~\ref{app:dual-derivation} gives the explicit Lagrangian derivation.
+The dual price $\lambda$ balances the trade-off between cost and error.
 
-\textbf{Roadmap.}
-The discussion above is an oracle calculation.
-If the losses $h_t(a)$ were known exactly, then the dual price would give the
-right cost-aware routing rule: choose
-$\lambda^\star\in\argmax_{\lambda\ge0}D(\lambda)$ in the one-dimensional dual,
-and then route each item by minimizing
-$C_t(a)+\lambda^\star h_t(a)$.
-The obstacle is that $h_t(a)$ depends on the true label $Y_t$.
-Thus the very quantity that makes the LP correct is unavailable before expert
-labels are observed.
-
-The rest of the paper studies two ways to make this oracle picture
-deployable.
+\subsection{Roadmap}
+The LP perspective characterizes the optimal labeling policy by using a dual price $\lambda$. In practice, the true losses $h_t(a)$ are unknown before expert labels are observed, so the implementable method uses proxy losses $\hath_t(a)$ to generate candidate prices and policies. The finite-sample validity of the selected policy is then supplied by held-out calibration labels, which certify the actual loss of the selected policy without requiring the proxy to be correct. This separates optimization from inference: the LP and proxy model seek cost efficiency, while calibration provides the PAC certificate.
 
 In the \textbf{offline setting}, we use proxy losses $\hath_t$ to generate
 fixed-price policies and reserve a calibration sample with expert labels to
 choose $\lambda$ with a high-probability error certificate.
 The proxy $\hath_t$ is used for efficient routing, while the calibration labels
 provide validity.
-
-In the \textbf{online setting}, labels are revealed only intermittently through
-random audits.
+    
+In the \textbf{online setting}, items arrive onlinely and labels are revealed only intermittently through random audits.
 Whenever the true label is observed, we obtain feedback about the realized
-loss $h_t$ and update the price $\lambda_t$ online through an
-inverse-probability, gradient-descent-like dual update.
+loss $h_t$ and update the price $\lambda_t$ through an online dual update.
 
 \section{Offline PAC Labeling via Calibration}
 \label{sec:offline-certification}
@@ -247,8 +207,8 @@ inverse-probability, gradient-descent-like dual update.
 \subsection{Offline Proxy Prices}
 \label{sec:proxy-estimation}
 
-The true cheap-source losses $h_t(j)$ are not known before expert labels are
-collected.
+The labeling losses $h_t(j)$ are unknown if expert labels are
+not collected.
 The offline development stage therefore learns or estimates a proxy
 \begin{equation}
     \hath_{t,j}
@@ -271,7 +231,7 @@ The implementable rule is the plug-in version of
     a_t^\lambda
     \in
     \argmin_{a\in\calA}
-    \{C_t(a)+\lambda\hath_t(a)\}.
+    \{c_t(a)+\lambda\hath_t(a)\}.
 \]
 Equivalently, first choose the cheapest proxy-adjusted cheap source,
 \begin{equation}
@@ -321,8 +281,8 @@ itemwise minimum of cheap-source costs plus priced predicted losses.
 \end{remark}
 
 The proxy LP viewpoint is useful but not sufficient for validity.
-For example, replacing $h_t$ by $\hath_t$ in
-\eqref{eq:oracle-lp-risk} would produce a proxy-constrained LP, and the rule
+For example, replacing $h_t$ by $\hath_t$ in the risk constraint of
+\eqref{eq:oracle-lp} would produce a proxy-constrained LP, and the rule
 above is exactly its Lagrangian minimizer.
 However, the proxy constraint is not an error certificate unless the proxy is
 known to dominate the true loss.
@@ -345,11 +305,16 @@ and its deployment cost is
     +(1-D_t^\lambda)c_{t,j_t^\lambda}.
     \label{eq:C-lambda}
 \end{equation}
-The finite-pool averages are
+Writing $a^\lambda_{1:T}=(a_1^\lambda,\ldots,a_T^\lambda)$ for the proxy-price
+policy, these are exactly the per-item loss and cost of
+\eqref{eq:itemwise-loss-cost} evaluated at $a_t^\lambda$, namely
+$H_t(\lambda)=h_t(a_t^\lambda)$ and $C_t(\lambda)=c_t(a_t^\lambda)$.
+The finite-pool averages are therefore the functionals $L_T,C_T$ of
+\eqref{eq:finite-pool-risk-cost} at this policy,
 \begin{equation}
-    L_T(\lambda)=\frac1T\sum_{t=1}^T H_t(\lambda),
+    L_T(\lambda):=L_T(a^\lambda_{1:T})=\frac1T\sum_{t=1}^T H_t(\lambda),
     \qquad
-    C_T(\lambda)=\frac1T\sum_{t=1}^T C_t(\lambda).
+    C_T(\lambda):=C_T(a^\lambda_{1:T})=\frac1T\sum_{t=1}^T C_t(\lambda).
     \label{eq:L-C-lambda}
 \end{equation}
 
@@ -424,12 +389,12 @@ observed expert labels in the released dataset.
 \subsubsection{Transductive Finite-Pool Guarantee}
 
 The transductive setting is closest to fixed-dataset PAC labeling.
-The target pool $\calT$ is fixed, and calibration indices
+The pool $X_1,\ldots,X_T$ is fixed, and calibration indices
 $I_1,\ldots,I_m$ are drawn independently from $\operatorname{Unif}([T])$.
 The expert labels $Y_{I_s}$ are then revealed.
 For each fixed $\lambda$,
 \[
-    \E\bigl[H_{I_s}(\lambda)\mid \calT, Y_{1:T}\bigr]
+    \E\bigl[H_{I_s}(\lambda)\mid X_{1:T}, Y_{1:T}\bigr]
     =
     L_T(\lambda).
 \]
@@ -535,6 +500,11 @@ followed by expert deferral if
     \label{eq:online-defer}
 \end{equation}
 Let $D_t=1$ denote this final-label deferral decision.
+The quantities $j_t^\star$, $D_t$, and the loss $H_t$ defined below are the
+online counterparts of the offline $j_t^\lambda$, $D_t^\lambda$, and
+$H_t(\lambda)$ from Section~\ref{sec:proxy-estimation}, evaluated at the
+time-varying price $\lambda_t$; we drop the explicit price superscript since it
+is implied by the round index $t$.
 If $D_t=1$, the output label is $Y_t$ and the final loss is zero.
 If $D_t=0$, the learner initially outputs $\hatY_t^{(j_t^\star)}$.
 It then draws an independent audit variable
@@ -783,7 +753,7 @@ fraction of items sent to the expert.}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.95\textwidth]{results/simple_offline_pac/simple_offline_pac_summary.png}
+\includegraphics[width=0.95\textwidth]{experiments/results/simple_offline_pac/simple_offline_pac_summary.png}
 \caption{Offline sweep over target error levels. After exploiting the
 single-source monotonicity, the fixed-price rule is nearly indistinguishable
 from the original scalar PAC baseline; the remaining gap comes from using a
@@ -844,7 +814,7 @@ largest budget saved in each dataset is shown in bold.}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.95\textwidth]{results/two_source_offline_pac/two_source_offline_pac_summary.png}
+\includegraphics[width=0.95\textwidth]{experiments/results/two_source_offline_pac/two_source_offline_pac_summary.png}
 \caption{Two-source synthetic routing sweep. Each single source can certify
 at most its own specialty half, so the three single-source curves saturate
 near $0.55$ (ImageNet) and $0.45$ (ImageNetV2). The LP method recovers most
@@ -1007,7 +977,7 @@ Using the equality convention $\mu_t(1-\sum_a x_{t,a})$, the Lagrangian is
 \begin{align}
     \calL(x;\lambda,\mu)
     =
-    &\frac1T\sum_{t,a} C_t(a)x_{t,a}
+    &\frac1T\sum_{t,a} c_t(a)x_{t,a}
     +\lambda\left(
         \frac1T\sum_{t,a}h_t(a)x_{t,a}-\eps
     \right)
@@ -1015,7 +985,7 @@ Using the equality convention $\mu_t(1-\sum_a x_{t,a})$, the Lagrangian is
     =
     &\sum_{t,a}
     \left[
-        \frac1T\{C_t(a)+\lambda h_t(a)\}-\mu_t
+        \frac1T\{c_t(a)+\lambda h_t(a)\}-\mu_t
     \right]x_{t,a}
     +\sum_{t=1}^T\mu_t-\lambda\eps .
     \label{eq:full-lagrangian}
@@ -1027,7 +997,7 @@ and only if
 \begin{equation}
     \mu_t
     \le
-    \frac1T\{C_t(a)+\lambda h_t(a)\},
+    \frac1T\{c_t(a)+\lambda h_t(a)\},
     \qquad t\in[T],\; a\in\calA .
     \label{eq:dual-feasibility-mu}
 \end{equation}
@@ -1046,7 +1016,7 @@ Thus the explicit dual LP is
     \textnormal{subject to}\quad
     & \mu_t
     \le
-    \frac1T\{C_t(a)+\lambda h_t(a)\},
+    \frac1T\{c_t(a)+\lambda h_t(a)\},
     \qquad t\in[T],\; a\in\calA, \nonumber\\
     & \lambda\ge0,\qquad \mu_t\in\R,\; t\in[T]. \nonumber
 \end{align}
@@ -1055,7 +1025,7 @@ optimal value is attained at
 \[
     \mu_t^\star(\lambda)
     =
-    \frac1T\min_{a\in\calA}\{C_t(a)+\lambda h_t(a)\}.
+    \frac1T\min_{a\in\calA}\{c_t(a)+\lambda h_t(a)\}.
 \]
 Substitution gives the reduced dual \eqref{eq:dual-problem}.
 The primal is feasible because choosing the expert for all items gives zero
@@ -1456,7 +1426,7 @@ uniform-certification cost.
 For each item $t$, set $\hath_t(E)=0$ and $\hath_t(j)=\hath_{t,j}$.
 The action selected by a fixed price is the lower envelope of the $k+1$ lines
 \[
-    C_t(a)+\lambda\hath_t(a),
+    c_t(a)+\lambda\hath_t(a),
     \qquad a\in\{E,1,\ldots,k\}.
 \]
 With a deterministic tie-breaking rule, the action can change only when two of
@@ -1485,7 +1455,7 @@ $\lambda\in[0,\lambda_{\max}]$ after replacing $|\Lambda|$ in
 \begin{proof}
 For a fixed item, the selected action is constant between consecutive crossing
 points of pairs of lines
-$C_t(a)+\lambda\hath_t(a)$.
+$c_t(a)+\lambda\hath_t(a)$.
 There are at most $\binom{k+1}{2}$ pairwise crossings per item.
 Across $T+m$ target and calibration items, there are therefore at most
 \[
@@ -1513,17 +1483,8 @@ audit or correction cost.
 
 \paragraph{Deployment labeling cost.}
 For a fixed offline price $\lambda$, the average deployment cost on the target
-pool is
-\begin{equation}
-    C_T^{\mathrm{dep}}(\lambda)
-    =
-    \frac1T\sum_{t=1}^T
-    \left[
-        D_t^\lambda c_{t,E}
-        +(1-D_t^\lambda)c_{t,j_t^\lambda}
-    \right].
-    \label{eq:deployment-cost}
-\end{equation}
+pool is exactly $C_T(\lambda)$ from \eqref{eq:L-C-lambda}, that is,
+$\frac1T\sum_{t=1}^T[D_t^\lambda c_{t,E}+(1-D_t^\lambda)c_{t,j_t^\lambda}]$.
 This is the cost optimized in \eqref{eq:certified-price-selection}.
 If cheap predictions have already been precomputed at no marginal deployment
 cost, set $c_{t,j}=0$.
@@ -1583,84 +1544,7 @@ cost under audit-and-correct is
 This identity isolates the extra expert cost paid to obtain online feedback;
 it is not a cost-regret guarantee.
 
-\section{Why Arbitrary Offline Labels Are Insufficient}
-\label{app:no-free-lunch}
-
-Without a relationship between the offline labeled data and the target pool, no
-distribution-free guarantee is possible.
-Suppose an offline labeled dataset shows that a cheap source is always correct,
-while on the target pool the same source is always wrong.
-If the learner observes no target labels, the two worlds are indistinguishable
-from the target-pool covariates and cheap predictions alone.
-Thus a PAC guarantee must rely on randomized target-pool labels, an i.i.d.
-sampling assumption, a covariate-shift correction assumption, or a structural
-assumption on the loss proxy.
-This is the offline analogue of the online no-free-lunch issue under partial
-feedback.
-
-\begin{thebibliography}{99}
-
-\bibitem{candes2025paclabels}
-Emmanuel J. Cand\`es, Andrew Ilyas, and Tijana Zrnic.
-\newblock Probably approximately correct labels.
-\newblock \emph{arXiv preprint arXiv:2506.10908}, 2025.
-
-\bibitem{vovk2005}
-Vladimir Vovk, Alexander Gammerman, and Glenn Shafer.
-\newblock \emph{Algorithmic Learning in a Random World}.
-\newblock Springer, 2005.
-
-\bibitem{angelopoulos2021gentle}
-Anastasios N. Angelopoulos and Stephen Bates.
-\newblock A gentle introduction to conformal prediction and distribution-free
-uncertainty quantification.
-\newblock \emph{arXiv preprint arXiv:2107.07511}, 2021.
-
-\bibitem{gibbs2021adaptive}
-Isaac Gibbs and Emmanuel Cand\`es.
-\newblock Adaptive conformal inference under distribution shift.
-\newblock In \emph{Advances in Neural Information Processing Systems}, 2021.
-
-\bibitem{ge2024stochastic}
-Haosen Ge, Hamsa Bastani, and Osbert Bastani.
-\newblock Stochastic online conformal prediction with semi-bandit feedback.
-\newblock \emph{arXiv preprint arXiv:2405.13268}, 2024.
-
-\bibitem{wang2025mirror}
-Bowen Wang, Matteo Zecchin, and Osvaldo Simeone.
-\newblock Mirror online conformal prediction with intermittent feedback.
-\newblock \emph{arXiv preprint arXiv:2503.10345}, 2025.
-
-\bibitem{yang2026adversarial}
-Junyoung Yang, Kyungmin Kim, and Sangdon Park.
-\newblock Online conformal prediction with adversarial semi-bandit feedback via
-regret minimization.
-\newblock \emph{arXiv preprint arXiv:2604.17984}, 2026.
-
-\bibitem{madras2018predict}
-David Madras, Toniann Pitassi, and Richard Zemel.
-\newblock Predict responsibly: Improving fairness and accuracy by learning to
-defer.
-\newblock In \emph{Advances in Neural Information Processing Systems}, 2018.
-
-\bibitem{mozannar2020consistent}
-Hussein Mozannar and David Sontag.
-\newblock Consistent estimators for learning to defer to an expert.
-\newblock In \emph{Proceedings of the 37th International Conference on Machine
-Learning}, PMLR 119:7076--7087, 2020.
-
-\bibitem{mao2023twostage}
-Anqi Mao, Christopher Mohri, Mehryar Mohri, and Yutao Zhong.
-\newblock Two-stage learning to defer with multiple experts.
-\newblock In \emph{Advances in Neural Information Processing Systems}, 2023.
-
-\bibitem{alves2024cost}
-Jean V. Alves, Diogo Leit\~ao, S\'ergio Jesus, Marco O. P. Sampaio,
-Javier Li\'ebana, Pedro Saleiro, M\'ario A. T. Figueiredo, and Pedro Bizarro.
-\newblock Cost-sensitive learning to defer to multiple experts with workload
-constraints.
-\newblock \emph{Transactions on Machine Learning Research}, 2024.
-
-\end{thebibliography}
+\bibliographystyle{unsrt}
+\bibliography{ref}
 
 \end{document}

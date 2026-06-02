@@ -36,3 +36,6 @@ HW4_副本/hw4_*_results.csv
 # Smoke-test outputs
 results/simple_offline_pac_smoke/
 results/simple_offline_pac_baseline_smoke/
+
+.vscode/
+.sixth/
