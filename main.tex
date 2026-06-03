@@ -443,11 +443,11 @@ sequentially, so the uncertainty threshold is updated over time.
 
 At time $t$, the learner observes the input $X_t$, cheap model labels
 $\{\hatY_t^{(j)}\}_{j=1}^k$, and predictable proxy losses
-$\{\hath_{t,j}\}_{j=1}^k$.  The proxy losses may be uncertainty scores,
+$\{\hath_t(j)\}_{j=1}^k$.  The proxy losses may be uncertainty scores,
 calibrated error estimates, or any predictable scores built from past
 expert/audit labels and current non-expert information.
 \textcolor{orange}{(LT: This is the delicate point:
-$\hath_{t,j}$ may use $X_t$, cheap model outputs, past expert labels, and past
+$\hath_t(j)$ may use $X_t$, cheap model outputs, past expert labels, and past
 audits, but it cannot use the current expert label $Y_t$, the current audit
 outcome $A_t$, or the current loss before the routing and audit decisions are
 made.)}
@@ -455,9 +455,9 @@ The algorithm first routes the item to the model with the smallest proxy loss:
 \begin{equation}
     j_t^\star
     \in
-    \argmin_{j\in[k]}\hath_{t,j},
+    \argmin_{j\in[k]}\hath_t(j),
     \qquad
-    \hath_t^\star=\hath_{t,j_t^\star}.
+    \hath_t^\star=\hath_t(j_t^\star).
     \label{eq:online-source}
 \end{equation}
 It then applies a scalar PAC-labeling threshold.  Let $\lambda_t\ge0$ denote
@@ -476,7 +476,7 @@ If $D_t=1$, the item is sent to the expert and the released label is
 $\tildeY_t=Y_t$.  If $D_t=0$, the algorithm initially releases the routed AI
 label $\tildeY_t=\hatY_t^{(j_t^\star)}$.  This is exactly the PAC-labeling
 threshold form.  The multi-model extension is contained in the
-routed score $\hath_t^\star=\min_j\hath_{t,j}$.
+routed score $\hath_t^\star=\min_j\hath_t(j)$.
 
 The main online obstacle is partial feedback.  When an AI label is used, its
 true loss is unobserved unless the expert label is also revealed.  Therefore,
@@ -543,12 +543,13 @@ for the final dataset.
 \caption{Audited online PAC labeling}
 \label{alg:online-audited}
 \begin{algorithmic}[1]
-\Require Stream horizon $T$; target error $\eps$; audit floor $p_{\min}$;
-step size $\eta$; internal target $\eps_0$.
+\Require Stream horizon $T$; target error $\eps\in[0,1]$; audit floor
+$p_{\min}$; step size $\eta$; internal target
+$\eps_0\in[0,\eps]$.
 \State Initialize $\lambda_1\ge0$.
 \For{$t=1,\ldots,T$}
     \State Observe $X_t$, cheap labels $\{\hatY_t^{(j)}\}_{j=1}^k$, and
-    predictable proxies $\{\hath_{t,j}\}_{j=1}^k$.
+    predictable proxies $\{\hath_t(j)\}_{j=1}^k$.
     \State Choose $j_t^\star$ and $\hath_t^\star$ by \eqref{eq:online-source}.
     \If{$\lambda_t\hath_t^\star\ge1$}
         \State Query the expert, output $\tildeY_t=Y_t$, set $D_t=1$ and
@@ -581,13 +582,13 @@ It controls realized error, not regret against an offline expert-query oracle.
 \begin{assumption}[Predictable routing and random audits]
 The routing decision, audit probability, and selected source are chosen using
 only past information and the current non-expert information
-$(X_t,\{\hatY_t^{(j)},\hath_{t,j}\}_{j=1}^k)$.
+$(X_t,\{\hatY_t^{(j)},\hath_t(j)\}_{j=1}^k)$.
 After this decision, the audit draw is independent Bernoulli with known
 probability $p_t\in[p_{\min},1]$.
 \end{assumption}
 
 \begin{assumption}[Proxy floor]
-For some $\rho>0$, $\hath_{t,j}\in[\rho,1]$ for all $t,j$.
+For some $\rho>0$, $\hath_t(j)\in[\rho,1]$ for all $t,j$.
 \end{assumption}
 
 For the finite-horizon analysis, define the augmented observation mask and its
@@ -607,6 +608,13 @@ written as the centered inverse-observation signal
     \frac{O_t}{q_t}\,(H_t-\eps_0).
     \label{eq:online-centered-signal}
 \end{equation}
+
+Let $\calG_t$ denote the pre-audit sigma-field that contains the history
+through round $t-1$, the current non-expert information, the selected source
+$j_t^\star$, the deferral decision $D_t$, the audit probability $p_t$, and the
+latent selected loss.  It does not contain the current audit draw $A_t$.
+The audit assumption says that, conditional on $\calG_t$, $A_t$ is an
+independent Bernoulli random variable with mean $p_t$ whenever $D_t=0$.
 
 \begin{proposition}[Unbiased intermittent update signal]
 \label{prop:online-unbiased}
@@ -635,7 +643,7 @@ Let
     \right\}.
 \]
 Run Algorithm~\ref{alg:online-audited} with constant step size $\eta>0$ and
-internal target $\eps_0\in[0,\eps]$.
+internal target $\eps_0\in[0,\eps]$, where $\eps\in[0,1]$.
 Then, for any fixed horizon $T$ and any $\delta\in(0,1)$, with probability at
 least $1-\delta$ over the audit randomness,
 \begin{equation}
@@ -682,6 +690,11 @@ with probability at least $1-\delta$.
 With $\eta\asymp T^{-1/2}$ and constant $p_{\min}$, the slack is
 $O(T^{-1/2})$.
 \end{corollary}
+
+The proofs of Proposition~\ref{prop:online-unbiased},
+Theorem~\ref{thm:online-audited}, and
+Corollary~\ref{cor:online-pac-tuning} are in
+Appendix~\ref{app:online-proofs}.
 
 \subsection{Offline versus Online Certification}
 
@@ -886,7 +899,37 @@ counterfactual average error of AI-labeled items before audit correction;
 \label{tab:online-main-results}
 \end{table}
 
+\section{Discussion}
+
+The report separates two regimes.
+The offline method has a clean division of labor.
+The proxy model and the LP structure make the policy cost efficient; the
+calibration set makes it valid.
+When instantiating the method, the main modeling choice is whether the target
+is transductive or inductive.
+If the application is dataset curation for a fixed unlabeled pool, the
+transductive theorem should be the main result.
+If the application is repeated deployment on future items, the inductive
+statement should be foregrounded.
+The online method addresses a different obstacle: the selected policy changes
+over time and AI losses are not observed without expert reveal.
+Random audits supply the missing feedback through an inverse-probability loss
+estimate.
+This gives finite-horizon error control, but not a cost-regret comparison to
+the offline oracle LP.
+The experiments in Section~\ref{sec:experiments} illustrate this distinction:
+offline calibration gives a clean finite-policy certificate, while the online
+mechanism exposes an explicit audit-cost versus correction tradeoff.
+The main empirical limitation is that the current data contain only one cheap
+source.
+A stronger test of the LP perspective would use several cheap sources with
+heterogeneous costs, where the original scalar threshold structure no longer
+captures the routing problem.
+
+\appendix
+
 \section{Related Work}
+\label{app:related-work}
 
 \paragraph{PAC labels and conformal calibration.}
 The closest starting point is PAC labeling
@@ -924,35 +967,6 @@ The distinction here is the finite-sample PAC certificate for the final
 released labels.
 The proxy router may be learned by standard supervised methods, but the
 guarantee comes from held-out calibration of the actual selected policy.
-
-\section{Discussion}
-
-The report separates two regimes.
-The offline method has a clean division of labor.
-The proxy model and the LP structure make the policy cost efficient; the
-calibration set makes it valid.
-When instantiating the method, the main modeling choice is whether the target
-is transductive or inductive.
-If the application is dataset curation for a fixed unlabeled pool, the
-transductive theorem should be the main result.
-If the application is repeated deployment on future items, the inductive
-statement should be foregrounded.
-The online method addresses a different obstacle: the selected policy changes
-over time and AI losses are not observed without expert reveal.
-Random audits supply the missing feedback through an inverse-probability loss
-estimate.
-This gives finite-horizon error control, but not a cost-regret comparison to
-the offline oracle LP.
-The experiments in Section~\ref{sec:experiments} illustrate this distinction:
-offline calibration gives a clean finite-policy certificate, while the online
-mechanism exposes an explicit audit-cost versus correction tradeoff.
-The main empirical limitation is that the current data contain only one cheap
-source.
-A stronger test of the LP perspective would use several cheap sources with
-heterogeneous costs, where the original scalar threshold structure no longer
-captures the routing problem.
-
-\appendix
 
 \section{Proofs}
 \label{app:proofs}
@@ -1093,12 +1107,14 @@ with conditional probability at least $1-\delta$.
 Combining the calibration and deployment events gives probability at least
 $1-\alpha-\delta$. \hfill$\square$
 
-\paragraph{Proof of Proposition 1.}
-For the analysis, let $\calG_t$ denote the post-decision sigma-field that
-fixes the selected source, audit probability, deferral decision, and the
-latent selected loss.
-The learner need not observe the latent loss; it is included only so the
-conditional expectation is well defined.
+\subsection{Online Proofs}
+\label{app:online-proofs}
+
+\paragraph{Proof of Proposition~\ref{prop:online-unbiased}.}
+Recall that $\calG_t$ fixes the predictable round-$t$ information, the selected
+source $j_t^\star$, the routed proxy loss
+$\hath_t^\star=\hath_t(j_t^\star)$, the audit probability $p_t$, the deferral
+decision $D_t$, and the latent selected loss, but not the audit draw $A_t$.
 If $D_t=1$, then $O_t=q_t=1$ and $H_t=0$, so
 \[
     \E\left[\frac{O_t}{q_t}\,\middle|\,\calG_t\right]=1,
@@ -1132,11 +1148,13 @@ Since $H_t$ and $\eps_0$ are fixed conditional on $\calG_t$, this also gives
     H_t-\eps_0.
 \] \hfill$\square$
 
-\paragraph{Proof of Theorem 2.}
+\paragraph{Proof of Theorem~\ref{thm:online-audited}.}
 First bound the price process.
 If $\lambda_t\ge\lambda_{\mathrm{def}}=1/\rho$, then
 \[
     \lambda_t\hath_t^\star
+    =
+    \lambda_t\hath_t(j_t^\star)
     \ge
     \lambda_{\mathrm{def}}\rho
     =
@@ -1146,7 +1164,8 @@ Thus the algorithm defers to the expert, so $D_t=1$ and
 $\widehat Z_t=-\eps_0$.
 Consequently $\lambda_{t+1}=[\lambda_t-\eta\eps_0]_+\le\lambda_t$.
 If instead $\lambda_t<\lambda_{\mathrm{def}}$, then
-$\widehat Z_t\le(1-\eps_0)/p_{\min}$ and hence
+$\widehat Z_t\le(1-\eps_0)/p_{\min}$ because
+$\eps_0\in[0,1]$ and the loss is bounded by one. Hence
 \[
     \lambda_{t+1}
     \le
@@ -1172,9 +1191,20 @@ Summing over $t=1,\ldots,T$ yields
 \]
 
 Let $M_t=(H_t-\eps_0)-\widehat Z_t$.
-By Proposition~\ref{prop:online-unbiased}, $M_t$ is a martingale difference
-with respect to the audit filtration.
-Moreover, $|M_t|\le1/p_{\min}$.
+By Proposition~\ref{prop:online-unbiased} and iterated expectation, $M_t$ is a
+martingale difference with respect to the filtration generated by the past
+rounds and the current audit draw. Moreover, $|M_t|\le1/p_{\min}$: if
+$D_t=1$, then $M_t=0$; if $D_t=0$ and $A_t=0$, then
+$|M_t|=|H_t-\eps_0|\le1$; and if $D_t=0$ and $A_t=1$, then
+\[
+    |M_t|
+    =
+    |H_t-\eps_0|\left|\frac{1}{p_t}-1\right|
+    \le
+    \frac{1}{p_t}
+    \le
+    \frac{1}{p_{\min}}.
+\]
 Azuma-Hoeffding gives, with probability at least $1-\delta$,
 \[
     \sum_{t=1}^T M_t
@@ -1191,7 +1221,7 @@ combining the last displays gives \eqref{eq:online-H-bound}.
 Finally, audit-and-correct gives $G_t\le H_t$ pointwise, which proves
 \eqref{eq:online-G-bound}. \hfill$\square$
 
-\paragraph{Proof of Corollary 2.}
+\paragraph{Proof of Corollary~\ref{cor:online-pac-tuning}.}
 The stated condition makes the right-hand side of
 \eqref{eq:online-G-bound} at most $\eps$.
 If $\eta\asymp T^{-1/2}$, $p_{\min}$ is constant, and the proxy floor is fixed
