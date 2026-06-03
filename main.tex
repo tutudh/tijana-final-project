@@ -53,6 +53,8 @@
 \newcommand{\argmin}{\operatorname*{arg\,min}}
 \newcommand{\argmax}{\operatorname*{arg\,max}}
 
+\newcommand{\zwy}[1]{\textcolor{red}{\textbf{WY: #1}}}
+
 \title{Online PAC Labeling from a Linear Programming Perspective}
 \author{STATS 357 Project}
 \date{\today}
@@ -86,8 +88,6 @@ controlling finite-horizon realized error.
 
 \subsection{Setup and Notation}
 
-We preserve the online notation $t=1,\ldots,T$ so that the offline and online
-formulations remain compatible.
 There is a fixed pool of unlabeled items $X_1,\ldots,X_T$,
 whose true labels $Y_1,\ldots,Y_T$ are initially unknown, and the goal is to labeling the items correctly while minimizing labeling cost.
 
@@ -101,9 +101,9 @@ The labeling loss is bounded:
 \end{equation}
 The expert action has zero labeling loss.
 Define the action set
-\[
+\(
     \calA = \{E,1,\ldots,k\},
-\]
+\)
 where $E$ denotes deferral to the expert.
 For $a\in\calA$, define the loss and cost for item $t$ by
 \begin{equation}
@@ -132,13 +132,6 @@ The resulting final label is
         \hatY_t^{(a_t)}, & a_t\in[k].
     \end{cases}
 \]
-The finite-pool average labeling error and average cost are
-\begin{equation}
-    L_T(a_{1:T}) = \frac1T\sum_{t=1}^T h_t(a_t),
-    \qquad
-    C_T(a_{1:T}) = \frac1T\sum_{t=1}^T c_t(a_t).
-    \label{eq:finite-pool-risk-cost}
-\end{equation}
 
 \subsection{The Cost-Aware Labeling LP}
 
@@ -178,7 +171,7 @@ The dual problem is the one-dimensional concave maximization problem (See Append
     \label{eq:dual-problem}
 \end{equation}
 This is the source of the fixed-price rule: once a price $\lambda$ is fixed,
-the dual minimization separates across items, and the action for item $t$ is given by the following rule:
+the dual minimization separates across items, and the action for item $t$ is given by the following simple rule:
 \begin{equation}
     a_t(\lambda)
     \in
@@ -204,23 +197,58 @@ loss $h_t$ and update the price $\lambda_t$ through an online dual update.
 \section{Offline PAC Labeling via Calibration}
 \label{sec:offline-certification}
 
-\subsection{Offline Proxy Prices}
+In this section, we first define the proxy-price labeling policies and then
+use a labeled calibration set to select a certified price for the target pool.
+
+
+\subsection{Price Estimation on A Calibration Set}
+\label{sec:calibration-selection}
+
+We sample a calibration set $I_1,\ldots,I_m$, define the empirical
+labeling loss
+\begin{equation}
+    \hatL_m(\lambda)
+    =
+    \frac1m\sum_{s=1}^m H_{I_s}(\lambda).
+    \label{eq:empirical-cal-loss}
+\end{equation}
+Because $\hatL_m(\lambda)$ is monotone in $\lambda$, certifying the entire
+family costs no more than certifying a single price. We use the Hoeffding bound to give a level-$(1-\alpha)$ upper confidence bound on $L_T(\lambda)$,
+\begin{equation}
+    U_m(\lambda;\alpha)
+    =
+    \hatL_m(\lambda)
+    +
+    \sqrt{\frac{\log(1/\alpha)}{2m}}.
+    \label{eq:hoeffding-ucb}
+\end{equation}
+Then the price can be estimated by solving the offline LP dual problem with the confidence upper bound $U_m(\lambda;\alpha)$ in place of the true loss $L_T(\lambda)$:
+\begin{equation}
+    \hat\lambda
+    =
+    \min\left\{\lambda\ge0 : U_m(\lambda;\alpha)\le\eps\right\},
+    \label{eq:certified-price-selection}
+\end{equation}
+falling back to the expert-only policy $\lambda=\infty$ if no finite price
+qualifies. Because $C_T(\lambda)$ is non-decreasing and $U_m(\lambda;\alpha)$
+non-increasing in $\lambda$, \eqref{eq:certified-price-selection} coincides with
+the cost-minimizing selection
+$\argmin_{\lambda}\{C_T(\lambda):U_m(\lambda;\alpha)\le\eps\}$.
+\zwy{How to solve this problem? and here is a constraint on the size of valibration set.}
+
+
+\subsection{Offline Labeling with Proxy Losses}
 \label{sec:proxy-estimation}
 
-The labeling losses $h_t(j)$ are unknown if expert labels are
-not collected.
-The offline development stage therefore learns or estimates a proxy
-\begin{equation}
-    \hath_{t,j}
-    =
-    \hath_j(X_t,\hatY_t^{(j)},\textnormal{metadata})
-    \in[0,1]
-    \label{eq:proxy-loss}
-\end{equation}
-for the loss of cheap source $j$ on item $t$.
+For a candidate price $\lambda$, the oracle action $a_t(\lambda)$ from
+\eqref{eq:true-price-action} cannot be computed because $h_t(a)$ is unknown.
+We therefore choose actions by replacing $h_t(a)$ with a proxy loss
+$\hath_t(a)$.
+
+
 The proxy may be obtained from a labeled training split by regression,
 isotonic calibration, multicalibration, or any other supervised procedure.
-The certification theorem below does not require $\hath_{t,j}$ to be
+The certification theorem below does not require $\hat h$ to be
 conservative or well calibrated.
 Better proxies reduce cost; held-out calibration supplies validity.
 
@@ -259,36 +287,6 @@ The action is
     \label{eq:proxy-action}
 \end{equation}
 
-\begin{remark}[Relation to the single-model PAC threshold]
-Once a candidate price $\lambda\ge0$ is fixed, the rule above reduces to the
-usual PAC-labeling threshold rule in the single-source special case.
-Indeed, with one cheap source, zero cheap-source cost, constant expert cost
-$c_E$, and a scalar proxy $\hath_t$ for cheap-source loss, the AI label is used
-exactly when
-\[
-    \lambda \hath_t < c_E,
-    \qquad\text{equivalently}\qquad
-    \hath_t < c_E/\lambda
-\]
-for $\lambda>0$.
-Thus the usual uncertainty threshold is the cost-aware threshold
-$c_E/\lambda$.
-In the proposed algorithm, $\lambda$ indexes a candidate policy and is selected
-from calibration data in Section~\ref{sec:calibration-selection}; it is not
-assumed known in advance.
-With multiple cheap sources, this scalar threshold is replaced by the
-itemwise minimum of cheap-source costs plus priced predicted losses.
-\end{remark}
-
-The proxy LP viewpoint is useful but not sufficient for validity.
-For example, replacing $h_t$ by $\hath_t$ in the risk constraint of
-\eqref{eq:oracle-lp} would produce a proxy-constrained LP, and the rule
-above is exactly its Lagrangian minimizer.
-However, the proxy constraint is not an error certificate unless the proxy is
-known to dominate the true loss.
-The role of the PAC calibration step is to certify the actual loss of the
-candidate prices generated by this plug-in dual rule.
-
 The counterfactual AI-decision loss of a fixed proxy-price policy is
 \begin{equation}
     H_t(\lambda)
@@ -318,44 +316,59 @@ The finite-pool averages are therefore the functionals $L_T,C_T$ of
     \label{eq:L-C-lambda}
 \end{equation}
 
-\subsection{Offline Calibration and Price Selection}
-\label{sec:calibration-selection}
+Recall from Section~\ref{sec:optimization-dual} that cheap sources are free
+and the expert costs 1. Then the implementable rule
+\eqref{eq:true-price-action} sends item $t$ to
+$j_t^\lambda=\argmin_{j}(c_{t,j}+\lambda\hath_{t,j})$ unless deferral is cheaper.
+Define the \emph{best-source} proxy uncertainty
+\begin{equation}
+    \hath_t^\star := \min_{j\in[k]} \hath_{t,j},
+    \qquad
+    j_t^\star \in \argmin_{j\in[k]} \hath_{t,j},
+    \label{eq:best-source-score}
+\end{equation}
+with $j_t^\star$ broken by a fixed, price-independent rule. Because all cheap
+costs are equal, $j_t^\lambda=j_t^\star$ for every $\lambda>0$: the price never
+reselects the source. The deferral rule \eqref{eq:proxy-defer} then collapses
+to a single scalar threshold on the score $\hath_t^\star$,
+\begin{equation}
+    D_t^\lambda = \ind{\hath_t^\star \ge 1/\lambda},
+    \label{eq:scalar-threshold}
+\end{equation}
+so item $t$ is routed to its fixed best source iff $\hath_t^\star<1/\lambda$.
+Thus $\hath_t^\star$ plays exactly the role of the uncertainty score in
+single-source PAC labeling, with induced threshold $\tau(\lambda)=1/\lambda$;
+raising $\lambda$ only moves items from route to defer. A deferred item incurs
+zero loss and a routed item incurs the fixed loss
+$\ell(Y_t,\hatY_t^{(j_t^\star)})$, so the per-item certificate increment
+$H_t(\lambda)$ of Section~\ref{sec:proxy-estimation}, and hence $L_T(\lambda)$
+and $\hatL_m(\lambda)$, is non-increasing in $\lambda$. The induced policies
+form the nested family $\{\Pi_\lambda\}_{\lambda\ge0}$ with at most $T+m$
+distinct breakpoints $\{1/\hath_t^\star\}$; the candidate set $\Lambda$ is this
+breakpoint set together with the expert-only policy ($\lambda=\infty$,
+$D_t^\infty=1$, $L_T(\infty)=0$). It may depend on the target covariates,
+cheap-source predictions, and any separate training data used to learn $\hath$,
+but it must not depend on the calibration labels used below.
 
-Let $\Lambda$ be a finite candidate price set.
-It may be a user-specified grid, or the set of policies induced by all
-breakpoints of the proxy-adjusted costs; Appendix~\ref{app:not-very-meaningful}
-records this finite reduction.
-The candidate set may depend on the target covariates, cheap-source
-predictions, costs, and separate training data used to learn $\hath$, but it
-must not depend on the calibration labels used below.
 
-For a labeled calibration sample $I_1,\ldots,I_m$, define
-\begin{equation}
-    \hatL_m(\lambda)
-    =
-    \frac1m\sum_{s=1}^m H_{I_s}(\lambda).
-    \label{eq:empirical-cal-loss}
-\end{equation}
-The uniform Hoeffding upper confidence bound is
-\begin{equation}
-    U_m(\lambda;\alpha)
-    =
-    \hatL_m(\lambda)
-    +
-    \sqrt{\frac{\log(|\Lambda|/\alpha)}{2m}}.
-    \label{eq:hoeffding-ucb}
-\end{equation}
-The certified price is selected by
-\begin{equation}
-    \hat\lambda
-    \in
-    \argmin_{\lambda\in\Lambda}
-    \left\{ C_T(\lambda): U_m(\lambda;\alpha)\le \eps\right\}.
-    \label{eq:certified-price-selection}
-\end{equation}
-If the feasible set is empty, include the expert-only policy
-as a candidate, denoted $\lambda=\infty$, for which $D_t^\infty=1$ and
-$L_T(\infty)=0$.
+
+% \begin{remark}[Unequal cheap-source costs]
+% \label{rmk:unequal-costs}
+% The reduction uses equal cheap-source costs (here $c_{t,j}\equiv0$). With
+% unequal costs the minimizer $j_t^\lambda$ can switch sources as $\lambda$
+% varies, at prices $\lambda=(c_{t,b}-c_{t,a})/(\hath_{t,a}-\hath_{t,b})$, and a
+% switch can raise a routed item's true loss, so $L_T(\lambda)$ need not be
+% monotone. One then reverts to a finite candidate set $\Lambda$ and the uniform
+% Hoeffding bound
+% \begin{equation}
+%     U_m^{\mathrm{unif}}(\lambda;\alpha)
+%     =
+%     \hatL_m(\lambda)+\sqrt{\frac{\log(|\Lambda|/\alpha)}{2m}},
+%     \label{eq:hoeffding-ucb-uniform}
+% \end{equation}
+% valid over all of $\Lambda$ by a union bound;
+% Appendix~\ref{app:not-very-meaningful} bounds the induced policy count.
+% \end{remark}
 
 \begin{algorithm}[t]
 \caption{Offline fixed-price cost-aware PAC labeling}
@@ -384,6 +397,30 @@ observed expert labels in the released dataset.
 \end{algorithmic}
 \end{algorithm}
 
+
+
+\paragraph{Relation to the single-model PAC labeling}
+
+{Once a candidate price $\lambda\ge0$ is fixed, the rule above reduces to the
+usual PAC-labeling threshold rule in the single-source special case.
+Indeed, with one cheap source, zero cheap-source cost, constant expert cost
+$c_E$, and a scalar proxy $\hath_t$ for cheap-source loss, the AI label is used
+exactly when
+\[
+    \lambda \hath_t < c_E,
+    \qquad\text{equivalently}\qquad
+    \hath_t < c_E/\lambda
+\]
+for $\lambda>0$.
+Thus the usual uncertainty threshold is the cost-aware threshold
+$c_E/\lambda$.
+In the proposed algorithm, $\lambda$ indexes a candidate policy and is selected
+from calibration data in Section~\ref{sec:calibration-selection}; it is not
+assumed known in advance.
+With multiple cheap sources, this scalar threshold is replaced by the
+itemwise minimum of cheap-source costs plus priced predicted losses.}
+
+
 \subsection{Offline PAC Guarantees}
 
 \subsubsection{Transductive Finite-Pool Guarantee}
@@ -399,38 +436,44 @@ For each fixed $\lambda$,
     L_T(\lambda).
 \]
 
-\begin{theorem}[Offline fixed-price PAC guarantee]
+\begin{theorem}[Offline PAC guarantee, monotone single-price form]
 \label{thm:offline-fixed-price-pac}
-Assume \eqref{eq:bounded-loss}.
-Let $\Lambda$ be finite and independent of the calibration labels conditional
-on the target pool, cheap-source predictions, costs, and any separate training
-data used to construct $\hath$.
-Let $\hat\lambda$ be selected by
-\eqref{eq:certified-price-selection} using \eqref{eq:hoeffding-ucb}.
-Then, with probability at least $1-\alpha$ over the random draw of the
-calibration indices,
+Assume \eqref{eq:bounded-loss} and equal cheap-source costs, so that
+\eqref{eq:scalar-threshold} holds and $L_T(\lambda)$ is non-increasing in
+$\lambda$. Let the proxy $\hath$---hence the score $\hath_t^\star$ and the
+nested family $\{\Pi_\lambda\}$---be constructed independently of the
+calibration labels, conditional on the target pool, cheap-source predictions,
+and any separate training data. Suppose that for each fixed price the
+single-price bound \eqref{eq:hoeffding-ucb} is a valid level-$(1-\alpha)$ upper
+confidence bound on $L_T(\lambda)$, required one $\lambda$ at a time, not
+simultaneously. Let $\hat\lambda$ be selected by
+\eqref{eq:certified-price-selection}. Then, with probability at least
+$1-\alpha$ over the random draw of the calibration indices,
 \begin{equation}
     L_T(\hat\lambda) \le \eps.
     \label{eq:offline-pac-guarantee}
 \end{equation}
-Consequently, the labels produced by the fixed-price policy
+Consequently the labels produced by the price-$\hat\lambda$ policy
 $a_t^{\hat\lambda}$ satisfy
 \begin{equation}
     \frac1T\sum_{t=1}^T \ell(Y_t,\tildeY_t) \le \eps
     \label{eq:final-label-guarantee}
 \end{equation}
-with probability at least $1-\alpha$.
-If calibration items are corrected to expert labels in the final dataset, the
-actual final loss is no larger than $L_T(\hat\lambda)$.
+with probability at least $1-\alpha$; if calibration items are corrected to
+expert labels in the final dataset, the actual final loss is no larger than
+$L_T(\hat\lambda)$.
 \end{theorem}
 
 \noindent
 The proof is in Appendix~\ref{app:proofs}.
-The key point is uniformity.
-If a price were fixed before observing calibration labels, a one-price
-confidence bound would suffice.
-Because the algorithm selects the cheapest empirically certified price, the
-confidence event must hold for every candidate policy in $\Lambda$.
+The key point is monotonicity, not uniformity. Although the algorithm selects
+among many candidate prices, $L_T(\lambda)$ is non-increasing in $\lambda$ by
+\eqref{eq:scalar-threshold}, so the only way the selected price can be
+infeasible is for the bound to fail at the single deterministic price where the
+true loss last crosses $\eps$. A union bound over $\Lambda$ is therefore
+unnecessary, exactly as in single-source PAC labeling and in the
+Dvoretzky--Kiefer--Wolfowitz inequality, whose freedom from multiplicity
+corrections also rests on monotonicity.
 
 \subsubsection{Inductive Deployment Guarantee}
 
@@ -778,15 +821,22 @@ respectively. Costs match the simple offline experiment: $c_A=c_B=0$,
 $c_E=1$, so the dual rule routes to $\argmin_j \hath_{t,j}$ and defers when
 $\min_j \hath_{t,j} > 1/\lambda$.
 We compare three calibrated policies. \emph{LP two-source uniform UCB} is
-the fixed-price rule of Section~\ref{sec:calibration-selection} applied to
-the constructed two-source pool; it uses the finite-class Hoeffding union
-bound \eqref{eq:hoeffding-ucb} over the same $\lvert\Lambda\rvert=202$
-threshold grid as the simple offline experiment, because the multi-source
-routed loss is no longer monotone in a scalar threshold. \emph{Source-$j$
-monotone PAC} ($j\in\{A,B\}$) is the original PAC baseline restricted to one
-source. \emph{Best-of-singles (Bonferroni)} runs both single-source baselines
-at level $\alpha/2$ and picks the source with the larger empirical savings on
-the calibration sample, which remains a valid $\alpha$-PAC procedure.
+the fixed-price rule of Section~\ref{sec:calibration-selection} applied to the
+constructed two-source pool, certified with the conservative finite-class
+Hoeffding bound \eqref{eq:hoeffding-ucb-uniform} over a
+$\lvert\Lambda\rvert=202$ threshold grid; we report it as a worst-case
+baseline. We emphasize, however, that with $c_A=c_B=0$ the routed loss
+\emph{is} monotone in the scalar score $\hath_t^\star=\min_j\hath_{t,j}$,
+because the source map $\argmin_j\hath_{t,j}$ does not depend on $\lambda$, so
+Theorem~\ref{thm:offline-fixed-price-pac} licenses the sharper single-price
+bound \eqref{eq:hoeffding-ucb} here as well; this replaces the
+$\sqrt{\log(\lvert\Lambda\rvert/\alpha)}$ radius by $\sqrt{\log(1/\alpha)}$ and
+is most consequential in the tight-$\eps$ regime discussed below.
+\emph{Source-$j$ monotone PAC} ($j\in\{A,B\}$) is the original PAC baseline
+restricted to one source. \emph{Best-of-singles (Bonferroni)} runs both
+single-source baselines at level $\alpha/2$ and picks the source with the
+larger empirical savings on the calibration sample, which remains a valid
+$\alpha$-PAC procedure.
 
 \begin{table}[htbp]
 \centering
@@ -838,10 +888,15 @@ radius $\sqrt{\log(202/\alpha)/(2m)}\approx 0.046$ leaves almost no headroom
 under $\eps=0.05$, so the LP rule certifies near-zero savings while each
 single-source baseline still certifies its specialty half
 (Figure~\ref{fig:two-source-main-results}; Table~\ref{tab:two-source-full-results}
-in the appendix reports the full sweep). A tighter
-deviation bound (Bernstein, or a $\sup$-deviation argument exploiting the
-unidimensional sufficient statistic $\min_j\hath_{t,j}$) would close this gap;
-we leave that to future work.
+in the appendix reports the full sweep). With equal cheap-source costs this
+gap is removed rather than merely shrunk: the routed loss is monotone in the
+unidimensional statistic $\hath_t^\star=\min_j\hath_{t,j}$, so
+Theorem~\ref{thm:offline-fixed-price-pac} certifies with the single-price
+radius $\sqrt{\log(1/\alpha)/(2m)}$ and pays no
+$\sqrt{\log\lvert\Lambda\rvert}$ penalty. The uniform-UCB numbers above are
+therefore a conservative baseline; the monotone certificate recovers the
+headroom lost at small $\eps$. (A variance-adaptive Bernstein bound would
+tighten the constant further; we leave that to future work.)
 
 \paragraph{Online audited routing.}
 The online experiment uses a random stream order and the dual-price update in
@@ -1034,47 +1089,47 @@ Therefore strong duality holds by finite-dimensional linear programming
 duality.
 
 \paragraph{Proof of Theorem 1.}
-For each fixed $\lambda\in\Lambda$, the variables
-$H_{I_s}(\lambda)$ are i.i.d. in $[0,1]$ with mean $L_T(\lambda)$ conditional
-on the target pool.
-Hoeffding's inequality gives
+Condition on the target pool and the proxy, so that $j_t^\star$, $\hath_t^\star$,
+the nested family $\{\Pi_\lambda\}$, and the per-routed-item losses
+$\ell(Y_t,\hatY_t^{(j_t^\star)})\in[0,1]$ are all deterministic. By
+\eqref{eq:scalar-threshold} a routed item contributes its fixed loss and a
+deferred item contributes zero, and the routed set
+$\{t:\hath_t^\star<1/\lambda\}$ shrinks as $\lambda$ grows; hence $H_t(\lambda)$
+is non-increasing in $\lambda$ for every $t$, and so are $L_T(\lambda)$ and
+$\hatL_m(\lambda)$. For each fixed $\lambda$ the calibration draws
+$H_{I_s}(\lambda)$ are i.i.d.\ in $[0,1]$ with mean $L_T(\lambda)$, so
+Hoeffding's inequality gives the single-price bound, valid one $\lambda$ at a
+time,
 \[
-    \Pp\left\{
-        L_T(\lambda)>
-        \hatL_m(\lambda)+
-        \sqrt{\frac{\log(|\Lambda|/\alpha)}{2m}}
-    \right\}
-    \le \frac{\alpha}{|\Lambda|}.
+    \Pp\bigl\{L_T(\lambda)>U_m(\lambda;\alpha)\bigr\}\le\alpha,
+    \qquad
+    U_m(\lambda;\alpha)=\hatL_m(\lambda)+\sqrt{\tfrac{\log(1/\alpha)}{2m}}.
 \]
-A union bound over $\Lambda$ implies that, with probability at least
-$1-\alpha$,
-\[
-    L_T(\lambda)\le U_m(\lambda;\alpha)
-    \qquad \text{for every }\lambda\in\Lambda.
-\]
-On this event, the selected price satisfies
-\[
-    L_T(\hat\lambda)
-    \le U_m(\hat\lambda;\alpha)
-    \le \eps
-\]
-by construction.
-The final label loss equals $H_t(\hat\lambda)$ on items not corrected by the
-expert and is at most $H_t(\hat\lambda)$ on calibration items if they are
-released with their expert labels.
-This proves the claim. \hfill$\square$
+Let $\lambda^\circ=\max\{\lambda\in\Lambda: L_T(\lambda)>\eps\}$ be the largest
+price whose true loss still exceeds the target; if no such price exists then
+even $\lambda=0$ is feasible and the claim is immediate. By monotonicity every
+price strictly above $\lambda^\circ$ is feasible, so it suffices to show
+$\hat\lambda>\lambda^\circ$ with probability at least $1-\alpha$. Suppose
+instead $\hat\lambda\le\lambda^\circ$. Since $\hat\lambda$ is the smallest price
+with $U_m(\lambda;\alpha)\le\eps$ and $U_m(\cdot;\alpha)$ is non-increasing,
+$U_m(\lambda^\circ;\alpha)\le U_m(\hat\lambda;\alpha)\le\eps$; but
+$L_T(\lambda^\circ)>\eps$ by definition, so the bound fails at the single fixed
+price $\lambda^\circ$, an event of probability at most $\alpha$ by single-price
+validity. Hence $\Pp\{\hat\lambda>\lambda^\circ\}\ge1-\alpha$, and on that event
+$L_T(\hat\lambda)\le\eps$. Integrating over the proxy preserves the bound. The
+final label loss equals $H_t(\hat\lambda)$ on items not corrected by the expert
+and is no larger on calibration items released with their expert labels. This
+proves the claim. \hfill$\square$
 
 \paragraph{Proof of Corollary 1.}
-For each fixed $\lambda\in\Lambda$, the calibration losses are i.i.d. in
-$[0,1]$ with mean $L(\lambda)$.
-Hoeffding's inequality and a union bound over $\Lambda$ imply that, with
-probability at least $1-\alpha$ over the calibration sample,
-\[
-    L(\lambda)\le U_m(\lambda;\alpha)
-    \qquad\text{for every }\lambda\in\Lambda.
-\]
-On this event, the selected price satisfies
-$L(\hat\lambda)\le U_m(\hat\lambda;\alpha)\le\eps$.
+For each fixed $\lambda$ the calibration losses are i.i.d.\ in $[0,1]$ with mean
+$L(\lambda)$, and under equal cheap-source costs $L(\lambda)$ is non-increasing
+in $\lambda$ by the same argument as in
+Theorem~\ref{thm:offline-fixed-price-pac}. The single-price bound
+\eqref{eq:hoeffding-ucb} is therefore valid one $\lambda$ at a time, and the
+monotone single-point argument of that proof---applied to $L(\lambda)$ in place
+of $L_T(\lambda)$---gives $L(\hat\lambda)\le\eps$ with probability at least
+$1-\alpha$ over the calibration sample.
 Conditional on the calibration sample and on this event, the deployment losses
 $\ell(Y_t,\tildeY_t)$ are independent, bounded in $[0,1]$, and have conditional
 mean at most $L(\hat\lambda)\le\eps$.
@@ -1407,7 +1462,7 @@ For example, for a fixed $\lambda$, an empirical Bernstein bound gives
     \frac{7\log(2/\alpha)}{3(m-1)},
 \end{equation}
 where $\hat V_m(\lambda)$ is the sample variance of $H_{I_s}(\lambda)$.
-For a finite grid, replace $\alpha$ by $\alpha/|\Lambda|$.
+For a finite grid under unequal costs (Remark~\ref{rmk:unequal-costs}), replace $\alpha$ by $\alpha/|\Lambda|$; under equal costs the monotone single-price bound needs no such correction.
 Betting-based confidence sequences can also be used if the calibration stream
 is reused while expanding the candidate price set.
 
@@ -1416,9 +1471,12 @@ is reused while expanding the candidate price set.
 
 The following observation is included only to show that a continuum of prices
 can be reduced to a finite policy class on a fixed finite dataset.
-It is not a main contribution: the resulting confidence penalty may be larger
-than that of a deliberately chosen price grid, and it does not remove the
-uniform-certification cost.
+It is relevant only under unequal cheap-source costs, where source selection
+varies with $\lambda$; under the equal-cost setting of the main text
+Theorem~\ref{thm:offline-fixed-price-pac} already certifies all prices without
+it. It is not a main contribution: the resulting confidence penalty may be
+larger than that of a deliberately chosen price grid, and it does not remove
+the uniform-certification cost.
 
 \subsection{Continuous Prices and Breakpoint Enumeration}
 \label{sec:breakpoints}
@@ -1447,9 +1505,13 @@ $\lambda\in[0,\lambda_{\max}]$ is at most
     1+2(T+m)\binom{k+1}{2}.
     \label{eq:breakpoint-count}
 \end{equation}
-Therefore Theorem~\ref{thm:offline-fixed-price-pac} holds uniformly over all
+Therefore the uniform guarantee holds over all
 $\lambda\in[0,\lambda_{\max}]$ after replacing $|\Lambda|$ in
-\eqref{eq:hoeffding-ucb} by $N_{\mathrm{br}}$.
+\eqref{eq:hoeffding-ucb-uniform} by $N_{\mathrm{br}}$. Under equal cheap-source
+costs this enumeration is unnecessary: source selection does not depend on
+$\lambda$, $L_T$ is monotone, and Theorem~\ref{thm:offline-fixed-price-pac}
+already certifies the whole continuum with the single-price bound
+\eqref{eq:hoeffding-ucb}.
 \end{corollary}
 
 \begin{proof}
