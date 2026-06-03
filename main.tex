@@ -23,6 +23,21 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.5\baselineskip}
 
+\makeatletter
+\renewcommand\section{\@startsection{section}{1}{\z@}%
+  {-1.4ex plus -0.4ex minus -.2ex}%
+  {0.6ex plus .2ex}%
+  {\normalfont\Large\bfseries}}
+\renewcommand\subsection{\@startsection{subsection}{2}{\z@}%
+  {-1.1ex plus -0.3ex minus -.2ex}%
+  {0.45ex plus .15ex}%
+  {\normalfont\large\bfseries}}
+\renewcommand\subsubsection{\@startsection{subsubsection}{3}{\z@}%
+  {-0.9ex plus -0.2ex minus -.2ex}%
+  {0.35ex plus .1ex}%
+  {\normalfont\normalsize\bfseries}}
+\makeatother
+
 \newtheorem{theorem}{Theorem}
 \newtheorem{proposition}{Proposition}
 \newtheorem{corollary}{Corollary}
@@ -55,29 +70,25 @@
 
 \newcommand{\zwy}[1]{\textcolor{red}{\textbf{WY: #1}}}
 
-\title{Online PAC Labeling from a Linear Programming Perspective}
-\author{Wanyu Zhang \and Lutong Hao \and Daohong Tu}
-\date{}
-
 \begin{document}
-\maketitle
+\vspace*{-0.65in}
+\begin{center}
+{\Large\bfseries Online PAC Labeling from a Linear Programming Perspective\par}
+\vspace{0.35em}
+Wanyu Zhang \quad Lutong Hao \quad Daohong Tu
+\end{center}
+\vspace{-0.6em}
 
-\begin{abstract}
-We revisit cost-aware probably approximately correct (PAC) labeling through a
-linear-programming perspective.
-For a finite target pool, multiple cheap labeling sources, and access to an
-expert labeler, the oracle problem is to minimize labeling cost subject to an
-average-error constraint.
-The Lagrange dual of this LP gives a scalar shadow price for error, and the
-resulting itemwise minimizer is a fixed-price routing rule over cheap sources
-and expert deferral.
-Since the oracle losses are unavailable before labeling, the implementable
-method uses proxy losses for efficient routing and held-out calibration labels
-for PAC validity.
-We also describe an audited online extension in which randomized expert audits
-produce inverse-probability feedback for updating the dual price and
-controlling finite-horizon realized error.
-\end{abstract}
+\noindent\textbf{Abstract.}
+We present PAC labeling from a finite-pool linear-programming perspective and
+use this view to motivate an online audited extension.  Offline, the LP dual
+induces a scalar price of error: proxy losses determine the routed cheap
+source and expert deferral, while held-out labels certify the selected policy.
+Online, the method maintains a moving
+threshold and uses randomized expert audits to obtain inverse-probability
+feedback for updating it.  Under predictable proxy scores and independent
+audits, this gives finite-horizon high-probability control of the realized
+error of the released labels.
 
 \section{Problem Setup and LP Formulation}
 \label{sec:optimization-dual}
@@ -87,21 +98,17 @@ controlling finite-horizon realized error.
 There is a fixed pool of unlabeled items $X_1,\ldots,X_T$,
 whose true labels $Y_1,\ldots,Y_T$ are initially unknown, and the goal is to labeling the items correctly while minimizing labeling cost.
 
-For each item $t$, we have access to $k$ cheap ML models, which produce predicted labels
-\(\hatY_t^{(j)}\). Also, the expert label $Y_t$ is treated as correct but incurs an expansive query cost $c_{t,E}>0$. In this project, we assume ML models are much cheaper than the expert, so we set $c_{t,j}=0$ for all $t$ and $j\in[k]$ and $c_{t,E}=1$.
-The labeling loss is bounded:
-\begin{equation}
-    0 \le \ell\bigl(Y_t,\hatY_t^{(j)}\bigr) \le 1,
-    \qquad t\in[T],\; j\in[k].
-    \label{eq:bounded-loss}
-\end{equation}
-The expert action has zero labeling loss.
 Define the action set
 \(
     \calA = \{E,1,\ldots,k\},
 \)
-where $E$ denotes deferral to the expert.
-For $a\in\calA$, define the loss and cost for item $t$ by
+where $E$ denotes deferral to the expert. The expert label $Y_t$ is treated as correct but incurs an 
+expansive query cost $c_{t}(E)>0$. For each item $X_t$, we have access to $k$ cheap ML models, which produce predicted labels
+\(\hatY_t^{(j)}\). 
+
+In this project, we assume ML models are much cheaper 
+than the expert. Therefore, define the loss $h_t(a)$ and 
+cost $c_t(a)$ for action $a$ on item $X_t$ by
 \begin{equation}
     h_t(a)
     =
@@ -118,6 +125,14 @@ For $a\in\calA$, define the loss and cost for item $t$ by
     \end{cases}
     \label{eq:itemwise-loss-cost}
 \end{equation}
+The labeling loss is assumed bounded and normalized:
+\(
+    0 \le \ell\bigl(Y_t,\hatY_t^{(j)}\bigr) \le 1,
+    \, \forall t\in[T],\; j\in[k].
+\)
+
+% For $a\in\calA$, define the loss and cost for item $t$ by
+
 A labeling rule chooses an action $a_t\in\calA$ for each item.
 The resulting final label is
 \[
@@ -132,6 +147,9 @@ The resulting final label is
 \subsection{The Cost-Aware Labeling LP}
 
 We formulate the cost-aware PAC labeling problem as a linear program.
+Intuitively, the LP minimizes labeling cost subject to an average-error constraint. The LP explicitly takes both the cost and the loss into account, 
+and it models multi-source setting.
+
 Let $x_{t,a}$ be the probability of choosing action $a$ on item $t$.
 If the true losses $h_t(a)$ were known,
 the optimal labeling policy would be the solution to the following LP:
@@ -139,8 +157,8 @@ the optimal labeling policy would be the solution to the following LP:
 \label{eq:oracle-lp}
 \begin{aligned}
     \textnormal{minimize}_{x}\quad
-    & \frac1T\sum_{t=1}^T\sum_{a\in\calA} c_t(a)x_{t,a}
-    \\
+    \frac1T\sum_{t=1}^T\sum_{a\in\calA} c_t(a)x_{t,a}
+    \qquad
     \textnormal{subject to}\quad
     & \frac1T\sum_{t=1}^T\sum_{a\in\calA} h_t(a)x_{t,a} \le \eps,
     \\
@@ -149,8 +167,7 @@ the optimal labeling policy would be the solution to the following LP:
     & x_{t,a}\ge0,\qquad t\in[T],\; a\in\calA.
 \end{aligned}
 \end{equation}
-Intuitively, the LP minimizes labeling cost subject to an average-error constraint. The LP explicitly takes both the cost and the loss into account, 
-and it models multi-source setting.
+
 
 \subsection{Lagrangian Dual and Shadow Price}
 
@@ -329,7 +346,7 @@ Otherwise, accept the routed cheap label and release
 
 The overall offline labeling algorithm is summarized in Algorithm~\ref{alg:offline-fixed-price}.
 
-\begin{algorithm}[t]
+\begin{algorithm}[ht]
 \caption{Offline fixed-price labeling}
 \label{alg:offline-fixed-price}
 \begin{algorithmic}[1]
@@ -417,7 +434,7 @@ stage.
 In an online data-curation problem, inputs arrive sequentially, decisions are
 made before future data are seen, and the loss of an AI-labeled item is
 unobserved unless an expert label is revealed.
-Therefore the offline calibration argument cannot be reused directly.
+% Therefore the offline calibration argument cannot be reused directly.
 
 The natural online analogue is to keep a moving PAC-labeling threshold. 
 We propose a framework for online PAC
@@ -444,11 +461,14 @@ $\{\hatY_t^{(j)}\}_{j=1}^k$, and predictable proxy losses
 $\{\hath_t(j)\}_{j=1}^k$.  The proxy losses may be uncertainty scores,
 calibrated error estimates, or any predictable scores built from past
 expert/audit labels and current non-expert information.
-\textcolor{orange}{(LT: This is the delicate point:
-$\hath_t(j)$ may use $X_t$, cheap model outputs, past expert labels, and past
-audits, but it cannot use the current expert label $Y_t$, the current audit
+% \textcolor{orange}{(LT: This is the delicate point:
+% $\hath_t(j)$ may use $X_t$, cheap model outputs, past expert labels, and past
+% audits, but it cannot use the current expert label $Y_t$, the current audit
+% outcome $A_t$, or the current loss before the routing and audit decisions are
+% made.)}
+Though it cannot use the current expert label $Y_t$, the current audit
 outcome $A_t$, or the current loss before the routing and audit decisions are
-made.)}
+made.
 The algorithm first routes the item to the model with the smallest proxy loss:
 \begin{equation}
     j_t^\lambda 
@@ -537,7 +557,7 @@ been wrong before correction.  This distinction is important: audits serve
 both as intermittent feedback for the moving PAC threshold and as corrections
 for the final dataset.
 
-\begin{algorithm}[t]
+\begin{algorithm}[ht]
 \caption{Audited online PAC labeling}
 \label{alg:online-audited}
 \begin{algorithmic}[1]
