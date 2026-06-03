@@ -420,106 +420,146 @@ In an online data-curation problem, inputs arrive sequentially, decisions are
 made before future data are seen, and the loss of an AI-labeled item is
 unobserved unless an expert label is revealed.
 Therefore the offline calibration argument cannot be reused directly.
-The natural online analogue is to keep the dual-price decision rule but add
-randomized audits of AI-labeled points.
 
-\subsection{Online Streaming Setup and Audited Feedback}
+The natural online analogue is to keep a moving PAC-labeling threshold. 
+We propose a framework for online PAC
+labeling in which randomized audits provide the intermittent feedback needed to
+keep realized error controlled.
 
-At time $t$, the learner observes $X_t$, cheap labels
-$\hatY_t^{(j)}$, costs $c_{t,j}$, expert cost $c_{t,E}$, and predictable proxy
-losses $\hath_{t,j}$.
-The price $\lambda_t$ is chosen from past information.
-The online fixed-price decision is
+\subsection{Online PAC Labeling Setup and Audited Feedback}
+\label{sec:online-free-ai}
+
+Following the action-cost notation in \eqref{eq:itemwise-loss-cost}, we focus
+on the regime
+\[
+    c_t(j)=0\quad\text{for all }t,j \in[k],
+    \qquad
+    c_t(E)=1.
+\]
+The online goal is therefore the same as
+PAC labeling: label as many items as possible with AI while controlling the
+average error of the released dataset.  The difference is that data arrive
+sequentially, so the uncertainty threshold is updated over time.
+
+At time $t$, the learner observes the input $X_t$, cheap model labels
+$\{\hatY_t^{(j)}\}_{j=1}^k$, and predictable proxy losses
+$\{\hath_{t,j}\}_{j=1}^k$.  The proxy losses may be uncertainty scores,
+calibrated error estimates, or any predictable scores built from past
+expert/audit labels and current non-expert information.
+\textcolor{orange}{(LT: This is the delicate point:
+$\hath_{t,j}$ may use $X_t$, cheap model outputs, past expert labels, and past
+audits, but it cannot use the current expert label $Y_t$, the current audit
+outcome $A_t$, or the current loss before the routing and audit decisions are
+made.)}
+The algorithm first routes the item to the model with the smallest proxy loss:
 \begin{equation}
     j_t^\star
     \in
-    \argmin_{j\in[k]}\{c_{t,j}+\lambda_t\hath_{t,j}\},
+    \argmin_{j\in[k]}\hath_{t,j},
+    \qquad
+    \hath_t^\star=\hath_{t,j_t^\star}.
     \label{eq:online-source}
 \end{equation}
-followed by expert deferral if
+It then applies a scalar PAC-labeling threshold.  Let $\lambda_t\ge0$ denote
+the current price of error.  Equivalently, $1/\lambda_t$ is the current
+uncertainty threshold, with the convention that $1/\lambda_t=\infty$ when
+$\lambda_t=0$.  The deferral decision is
 \begin{equation}
-    c_{t,E}
-    \le
-    c_{t,j_t^\star}+\lambda_t\hath_{t,j_t^\star}.
+    D_t
+    =
+    \ind{\lambda_t\hath_t^\star\ge1}
+    =
+    \ind{\hath_t^\star\ge 1/\lambda_t}.
     \label{eq:online-defer}
 \end{equation}
-Let $D_t=1$ denote this final-label deferral decision.
-The quantities $j_t^\star$, $D_t$, and the loss $H_t$ defined below are the
-online counterparts of the offline $j_t^\lambda$, $D_t^\lambda$, and
-$H_t(\lambda)$ from Section~\ref{sec:proxy-estimation}, evaluated at the
-time-varying price $\lambda_t$; we drop the explicit price superscript since it
-is implied by the round index $t$.
-If $D_t=1$, the output label is $Y_t$ and the final loss is zero.
-If $D_t=0$, the learner initially outputs $\hatY_t^{(j_t^\star)}$.
-It then draws an independent audit variable
+If $D_t=1$, the item is sent to the expert and the released label is
+$\tildeY_t=Y_t$.  If $D_t=0$, the algorithm initially releases the routed AI
+label $\tildeY_t=\hatY_t^{(j_t^\star)}$.  This is exactly the PAC-labeling
+threshold form.  The multi-model extension is contained in the
+routed score $\hath_t^\star=\min_j\hath_{t,j}$.
+
+The main online obstacle is partial feedback.  When an AI label is used, its
+true loss is unobserved unless the expert label is also revealed.  Therefore,
+after every AI decision, the algorithm uses an audit probability chosen in
+advance of the audit draw and before observing the current expert label:
 \[
     A_t\sim\mathrm{Bernoulli}(p_t),
     \qquad p_t\in[p_{\min},1].
 \]
-If $A_t=1$, the expert label is revealed and the final released label may be
-corrected to $Y_t$.
-The audit still records the counterfactual AI error for updating the price.
+If $A_t=1$, the expert label is queried, the final released label is
+corrected to $Y_t$, and the audit records the counterfactual error of the
+routed AI label.
 
 Define the counterfactual AI-decision loss
 \[
     H_t
     =
-    (1-D_t)\ell\bigl(Y_t,\hatY_t^{(j_t^\star)}\bigr),
+    (1-D_t)\ell\bigl(Y_t,\hatY_t^{(j_t^\star)}\bigr).
 \]
-where deferral has zero loss because the expert label is used.
-Deferral is an observed zero-loss event, while an unaudited AI decision has
-unobserved loss.  Define the augmented observation mask and its conditional
-observation probability by
-\begin{equation}
-    O_t=D_t+(1-D_t)A_t,
-    \qquad
-    q_t=D_t+(1-D_t)p_t .
-    \label{eq:online-augmented-mask}
-\end{equation}
-Thus $q_t=1$ when $D_t=1$ and $q_t=p_t$ when $D_t=0$.
-The centered inverse-observation update signal is
-\begin{equation}
+Deferral has zero loss because the expert label is used.  An unaudited AI
+decision may have nonzero loss, but that loss is not observed.  The update
+uses an internal target $\eps_0\le\eps$:
+\[
     \widehat Z_t
     =
-    \frac{O_t}{q_t}\,(H_t-\eps_0).
-    \label{eq:online-centered-signal}
-\end{equation}
-The realized final loss after audit-and-correct is
-\[
-    G_t=\ell(Y_t,\tildeY_t),
-    \qquad
-    G_t\le H_t.
+    \begin{cases}
+        -\eps_0,
+        & \text{if the item is deferred to the expert},\\[2mm]
+        \{\ell(Y_t,\hatY_t^{(j_t^\star)})-\eps_0\}/p_t,
+        & \text{if the AI label is used and audited},\\[2mm]
+        0,
+        & \text{if the AI label is used and not audited}.
+    \end{cases}
 \]
-The online price update is
+The role of $\eps_0$ is to leave room for finite-horizon statistical guarantee:
+the algorithm updates toward the internal target $\eps_0$, while the final PAC
+target is $\eps$.  Corollary~\ref{cor:online-pac-tuning} gives the condition
+under which choosing $\eps_0$ yields final error at most $\eps$.
+The price update is
 \begin{equation}
-    \lambda_{t+1}
-    =
-    [\lambda_t+\eta\widehat Z_t]_+,
+    \lambda_{t+1}=[\lambda_t+\eta\widehat Z_t]_+,
     \label{eq:online-price-update}
 \end{equation}
-where $\eta>0$ is a step size and $\eps_0\le\eps$ is an internal error target.
+where $\eta>0$ is a step size.
+When audited AI mistakes occur more often than the internal target
+\(\eps_0\), the update increases \(\lambda_t\), lowers the threshold
+\(1/\lambda_t\), and makes future routing more conservative.  When
+deferrals or low-error audits dominate, the price decreases and the algorithm
+allows more AI labels.
+
+Let $G_t=\ell(Y_t,\tildeY_t)$ be the realized final loss after
+audit-and-correct.  Since audited AI errors are corrected (so loss becomes zero), and expert deferrals
+use the true label,
+\[
+    G_t\le H_t.
+\]
+The reported final error is the realized error $G_t$ after audit-and-correct, whereas
+the counterfactual AI error tracks how often the routed AI label would have
+been wrong before correction.  This distinction is important: audits serve
+both as intermittent feedback for the moving PAC threshold and as corrections
+for the final dataset.
 
 \begin{algorithm}[t]
-\caption{Audited online dual-price PAC labeling}
+\caption{Audited online PAC labeling}
 \label{alg:online-audited}
 \begin{algorithmic}[1]
 \Require Stream horizon $T$; target error $\eps$; audit floor $p_{\min}$;
 step size $\eta$; internal target $\eps_0$.
 \State Initialize $\lambda_1\ge0$.
 \For{$t=1,\ldots,T$}
-    \State Observe $X_t$, cheap labels $\{\hatY_t^{(j)}\}_{j=1}^k$, costs, and
+    \State Observe $X_t$, cheap labels $\{\hatY_t^{(j)}\}_{j=1}^k$, and
     predictable proxies $\{\hath_{t,j}\}_{j=1}^k$.
-    \State Choose $j_t^\star$ by \eqref{eq:online-source}.
-    \If{\eqref{eq:online-defer} holds}
+    \State Choose $j_t^\star$ and $\hath_t^\star$ by \eqref{eq:online-source}.
+    \If{$\lambda_t\hath_t^\star\ge1$}
         \State Query the expert, output $\tildeY_t=Y_t$, set $D_t=1$ and
         $\widehat Z_t=-\eps_0$.
     \Else
         \State Output the AI label $\tildeY_t=\hatY_t^{(j_t^\star)}$ and set
         $D_t=0$.
-        \State Draw $A_t\sim\mathrm{Bernoulli}(p_t)$ with
-        $p_t\in[p_{\min},1]$.
+        \State Choose $p_t\in[p_{\min},1]$ before observing $Y_t$, then draw
+        $A_t\sim\mathrm{Bernoulli}(p_t)$.
         \If{$A_t=1$}
-            \State Query the expert, optionally correct $\tildeY_t=Y_t$, and
+            \State Query the expert, correct $\tildeY_t=Y_t$, and
             set
             $\widehat Z_t=
             \{\ell(Y_t,\hatY_t^{(j_t^\star)})-\eps_0\}/p_t$.
@@ -536,28 +576,37 @@ step size $\eta$; internal target $\eps_0$.
 
 The online result is distribution-free with respect to the data sequence; the
 probability is over the algorithm's audit randomness.
-It controls realized error, not cost regret against the offline LP optimum.
+It controls realized error, not regret against an offline expert-query oracle.
 
 \begin{assumption}[Predictable routing and random audits]
 The routing decision, audit probability, and selected source are chosen using
 only past information and the current non-expert information
-$(X_t,\{\hatY_t^{(j)},\hath_{t,j},c_{t,j}\}_{j=1}^k,c_{t,E})$.
+$(X_t,\{\hatY_t^{(j)},\hath_{t,j}\}_{j=1}^k)$.
 After this decision, the audit draw is independent Bernoulli with known
 probability $p_t\in[p_{\min},1]$.
 \end{assumption}
 
-\begin{assumption}[Proxy floor and bounded expert cost]
+\begin{assumption}[Proxy floor]
 For some $\rho>0$, $\hath_{t,j}\in[\rho,1]$ for all $t,j$.
-For the fixed horizon, let
-\[
-    c_{\min}=\min_{t\le T,\;j\in[k]} c_{t,j},
-    \qquad
-    c_E^{\max}=\max_{t\le T} c_{t,E}.
-\]
-If future costs are not known in advance, these extrema may be replaced by any
-deterministic lower bound on cheap-source costs and upper bound on expert
-costs that are known before deployment.
 \end{assumption}
+
+For the finite-horizon analysis, define the augmented observation mask and its
+conditional observation probability by
+\begin{equation}
+    O_t=D_t+(1-D_t)A_t,
+    \qquad
+    q_t=D_t+(1-D_t)p_t .
+    \label{eq:online-augmented-mask}
+\end{equation}
+Thus $q_t=1$ on expert deferrals and $q_t=p_t$ on AI decisions.  The
+three-case update in Algorithm~\ref{alg:online-audited} can equivalently be
+written as the centered inverse-observation signal
+\begin{equation}
+    \widehat Z_t
+    =
+    \frac{O_t}{q_t}\,(H_t-\eps_0).
+    \label{eq:online-centered-signal}
+\end{equation}
 
 \begin{proposition}[Unbiased intermittent update signal]
 \label{prop:online-unbiased}
@@ -576,7 +625,7 @@ Let
 \[
     \lambda_{\mathrm{def}}
     =
-    \frac{(c_E^{\max}-c_{\min})_+}{\rho},
+    \frac{1}{\rho},
     \qquad
     \Lambda_{\mathrm{on}}
     =
@@ -1085,15 +1134,13 @@ Since $H_t$ and $\eps_0$ are fixed conditional on $\calG_t$, this also gives
 
 \paragraph{Proof of Theorem 2.}
 First bound the price process.
-If $\lambda_t\ge\lambda_{\mathrm{def}}$, then for every cheap source $j$,
+If $\lambda_t\ge\lambda_{\mathrm{def}}=1/\rho$, then
 \[
-    c_{t,j}+\lambda_t\hath_{t,j}
+    \lambda_t\hath_t^\star
     \ge
-    c_{\min}+\lambda_{\mathrm{def}}\rho
-    \ge
-    c_E^{\max}
-    \ge
-    c_{t,E}.
+    \lambda_{\mathrm{def}}\rho
+    =
+    1.
 \]
 Thus the algorithm defers to the expert, so $D_t=1$ and
 $\widehat Z_t=-\eps_0$.
@@ -1147,8 +1194,8 @@ Finally, audit-and-correct gives $G_t\le H_t$ pointwise, which proves
 \paragraph{Proof of Corollary 2.}
 The stated condition makes the right-hand side of
 \eqref{eq:online-G-bound} at most $\eps$.
-If $\eta\asymp T^{-1/2}$, $p_{\min}$ is constant, and the costs and proxy floor
-are fixed so that $\Lambda_{\mathrm{on}}=O(1)$, then both excess terms in
+If $\eta\asymp T^{-1/2}$, $p_{\min}$ is constant, and the proxy floor is fixed
+so that $\Lambda_{\mathrm{on}}=O(1)$, then both excess terms in
 \eqref{eq:online-G-bound} are $O(T^{-1/2})$. \hfill$\square$
 
 \section{Experimental Details}
@@ -1501,8 +1548,7 @@ cost under audit-and-correct is
 \[
     \E[C_t\mid\calG_t]
     =
-    D_t c_{t,E}
-    +(1-D_t)\left(c_{t,j_t^\star}+p_t c_{t,E}\right).
+    D_t+(1-D_t)p_t .
 \]
 This identity isolates the extra expert cost paid to obtain online feedback;
 it is not a cost-regret guarantee.
