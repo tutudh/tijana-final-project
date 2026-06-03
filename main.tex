@@ -194,7 +194,7 @@ In the \textbf{online setting}, items arrive onlinely and labels are revealed on
 Whenever the true label is observed, we obtain feedback about the realized
 loss $h_t$ and update the price $\lambda_t$ through an online dual update.
 
-\section{Offline PAC Labeling via Calibration}
+\section{Offline PAC Labeling}
 \label{sec:offline-certification}
 
 In this section, we first define the proxy-price labeling policies and then
@@ -234,10 +234,10 @@ qualifies. Because $C_T(\lambda)$ is non-decreasing and $U_m(\lambda;\alpha)$
 non-increasing in $\lambda$, \eqref{eq:certified-price-selection} coincides with
 the cost-minimizing selection
 $\argmin_{\lambda}\{C_T(\lambda):U_m(\lambda;\alpha)\le\eps\}$.
-\zwy{How to solve this problem? and here is a constraint on the size of valibration set.}
+\zwy{How to solve this problem? and here is a constraint on the size of calibration set.}
 
 
-\subsection{Offline Labeling with Proxy Losses}
+\subsection{Labeling with Proxy Losses}
 \label{sec:proxy-estimation}
 
 For a candidate price $\lambda$, the oracle action $a_t(\lambda)$ from
@@ -245,15 +245,13 @@ For a candidate price $\lambda$, the oracle action $a_t(\lambda)$ from
 We therefore choose actions by replacing $h_t(a)$ with a proxy loss
 $\hath_t(a)$.
 
-
 The proxy may be obtained from a labeled training split by regression,
 isotonic calibration, multicalibration, or any other supervised procedure.
 The certification theorem below does not require $\hat h$ to be
 conservative or well calibrated.
 Better proxies reduce cost; held-out calibration supplies validity.
 
-Set $\hath_t(E)=0$ and $\hath_t(j)=\hath_{t,j}$ for $j\in[k]$.
-The implementable rule is the plug-in version of
+Given proxy $\hath_t(a)$, the implementable rule is the plug-in version of
 \eqref{eq:true-price-action}:
 \[
     a_t^\lambda
@@ -261,22 +259,7 @@ The implementable rule is the plug-in version of
     \argmin_{a\in\calA}
     \{c_t(a)+\lambda\hath_t(a)\}.
 \]
-Equivalently, first choose the cheapest proxy-adjusted cheap source,
-\begin{equation}
-    j_t^\lambda \in \argmin_{j\in[k]}
-    \{c_{t,j}+\lambda \hath_{t,j}\},
-    \label{eq:proxy-j-star}
-\end{equation}
-and then defer to the expert when the expert is no more expensive than the
-selected cheap source after pricing the predicted loss:
-\begin{equation}
-    D_t^\lambda
-    =
-    \ind{c_{t,E}\le c_{t,j_t^\lambda}+\lambda \hath_{t,j_t^\lambda}}.
-    \label{eq:proxy-defer}
-\end{equation}
-Here $D_t^\lambda=1$ means deferral.
-The action is
+Equivalently, the update rule is to first choose the model with the lowest proxy loss $j_t^\lambda \in \argmin_{j\in[k]} \{\hath_{t,j}\}$, then defer to expert if and only if $\hath_{t,j_t^\lambda}\ge 1/\lambda$. Denote $D_t^\lambda = \ind{\hath_{t,j_t^\lambda}\ge 1/\lambda}$, then the action is
 \begin{equation}
     a_t^\lambda
     =
@@ -287,143 +270,63 @@ The action is
     \label{eq:proxy-action}
 \end{equation}
 
-The counterfactual AI-decision loss of a fixed proxy-price policy is
+The labeling loss and the cost given a price $\lambda$ are then
 \begin{equation}
     H_t(\lambda)
     =
     (1-D_t^\lambda)
-    \ell\bigl(Y_t,\hatY_t^{(j_t^\lambda)}\bigr),
-    \label{eq:H-lambda}
-\end{equation}
-and its deployment cost is
-\begin{equation}
+    \ell\bigl(Y_t,\hatY_t^{(j_t^\lambda)}\bigr),\qquad 
     C_t(\lambda)
     =
-    D_t^\lambda c_{t,E}
-    +(1-D_t^\lambda)c_{t,j_t^\lambda}.
-    \label{eq:C-lambda}
+    D_t^\lambda.
+    \label{eq:H-C-lambda}
 \end{equation}
-Writing $a^\lambda_{1:T}=(a_1^\lambda,\ldots,a_T^\lambda)$ for the proxy-price
-policy, these are exactly the per-item loss and cost of
-\eqref{eq:itemwise-loss-cost} evaluated at $a_t^\lambda$, namely
-$H_t(\lambda)=h_t(a_t^\lambda)$ and $C_t(\lambda)=c_t(a_t^\lambda)$.
-The finite-pool averages are therefore the functionals $L_T,C_T$ of
-\eqref{eq:finite-pool-risk-cost} at this policy,
+
+Then the average loss and cost of the price-$\lambda$ policy are
 \begin{equation}
-    L_T(\lambda):=L_T(a^\lambda_{1:T})=\frac1T\sum_{t=1}^T H_t(\lambda),
+    L_T(\lambda)=\frac1T\sum_{t=1}^T H_t(\lambda),
     \qquad
-    C_T(\lambda):=C_T(a^\lambda_{1:T})=\frac1T\sum_{t=1}^T C_t(\lambda).
+    C_T(\lambda)=\frac1T\sum_{t=1}^T C_t(\lambda).
     \label{eq:L-C-lambda}
 \end{equation}
 
-Recall from Section~\ref{sec:optimization-dual} that cheap sources are free
-and the expert costs 1. Then the implementable rule
-\eqref{eq:true-price-action} sends item $t$ to
-$j_t^\lambda=\argmin_{j}(c_{t,j}+\lambda\hath_{t,j})$ unless deferral is cheaper.
-Define the \emph{best-source} proxy uncertainty
-\begin{equation}
-    \hath_t^\star := \min_{j\in[k]} \hath_{t,j},
-    \qquad
-    j_t^\star \in \argmin_{j\in[k]} \hath_{t,j},
-    \label{eq:best-source-score}
-\end{equation}
-with $j_t^\star$ broken by a fixed, price-independent rule. Because all cheap
-costs are equal, $j_t^\lambda=j_t^\star$ for every $\lambda>0$: the price never
-reselects the source. The deferral rule \eqref{eq:proxy-defer} then collapses
-to a single scalar threshold on the score $\hath_t^\star$,
-\begin{equation}
-    D_t^\lambda = \ind{\hath_t^\star \ge 1/\lambda},
-    \label{eq:scalar-threshold}
-\end{equation}
-so item $t$ is routed to its fixed best source iff $\hath_t^\star<1/\lambda$.
-Thus $\hath_t^\star$ plays exactly the role of the uncertainty score in
-single-source PAC labeling, with induced threshold $\tau(\lambda)=1/\lambda$;
-raising $\lambda$ only moves items from route to defer. A deferred item incurs
-zero loss and a routed item incurs the fixed loss
-$\ell(Y_t,\hatY_t^{(j_t^\star)})$, so the per-item certificate increment
-$H_t(\lambda)$ of Section~\ref{sec:proxy-estimation}, and hence $L_T(\lambda)$
-and $\hatL_m(\lambda)$, is non-increasing in $\lambda$. The induced policies
-form the nested family $\{\Pi_\lambda\}_{\lambda\ge0}$ with at most $T+m$
-distinct breakpoints $\{1/\hath_t^\star\}$; the candidate set $\Lambda$ is this
-breakpoint set together with the expert-only policy ($\lambda=\infty$,
-$D_t^\infty=1$, $L_T(\infty)=0$). It may depend on the target covariates,
-cheap-source predictions, and any separate training data used to learn $\hath$,
-but it must not depend on the calibration labels used below.
-
-
-
-% \begin{remark}[Unequal cheap-source costs]
-% \label{rmk:unequal-costs}
-% The reduction uses equal cheap-source costs (here $c_{t,j}\equiv0$). With
-% unequal costs the minimizer $j_t^\lambda$ can switch sources as $\lambda$
-% varies, at prices $\lambda=(c_{t,b}-c_{t,a})/(\hath_{t,a}-\hath_{t,b})$, and a
-% switch can raise a routed item's true loss, so $L_T(\lambda)$ need not be
-% monotone. One then reverts to a finite candidate set $\Lambda$ and the uniform
-% Hoeffding bound
-% \begin{equation}
-%     U_m^{\mathrm{unif}}(\lambda;\alpha)
-%     =
-%     \hatL_m(\lambda)+\sqrt{\frac{\log(|\Lambda|/\alpha)}{2m}},
-%     \label{eq:hoeffding-ucb-uniform}
-% \end{equation}
-% valid over all of $\Lambda$ by a union bound;
-% Appendix~\ref{app:not-very-meaningful} bounds the induced policy count.
-% \end{remark}
+The overall offline labeling algorithm is summarized in Algorithm~\ref{alg:offline-fixed-price}.
 
 \begin{algorithm}[t]
-\caption{Offline fixed-price cost-aware PAC labeling}
+\caption{Offline fixed-price labeling}
 \label{alg:offline-fixed-price}
 \begin{algorithmic}[1]
-\Require Target pool $\{X_t\}_{t=1}^T$; cheap predictions
-$\{\hatY_t^{(j)}\}_{t,j}$; costs $\{c_{t,j}\}_{t,j}$ and $\{c_{t,E}\}_t$;
-target error $\eps$; failure level $\alpha$; candidate prices $\Lambda$.
-\Ensure A certified price $\hat\lambda$ and final labels
-$\tildeY_1,\ldots,\tildeY_T$.
-\State Use a labeled training split, if available, to fit proxy losses
-$\hath_{t,j}\in[0,1]$.
-\State For every $\lambda\in\Lambda$ and target item $t$, compute
-$j_t^\lambda$, $D_t^\lambda$, and $C_t(\lambda)$ using
-\eqref{eq:proxy-j-star}--\eqref{eq:C-lambda}.
-\State On an independent labeled calibration split, evaluate
-$H_{I_s}(\lambda)$ and $\hatL_m(\lambda)$ for every $\lambda\in\Lambda$.
-\State Compute $U_m(\lambda;\alpha)$ from \eqref{eq:hoeffding-ucb}.
-\State Select $\hat\lambda$ by \eqref{eq:certified-price-selection};
-fall back to the expert-only policy if no nontrivial price is certified.
-\State For each target item, output the expert label if
-$D_t^{\hat\lambda}=1$; otherwise output
-$\hatY_t^{(j_t^{\hat\lambda})}$.
-\State If calibration items belong to the target pool, use their already
-observed expert labels in the released dataset.
+\Require Unlabeled pool $X_1,\ldots,X_T$; cheap predictions $\{\hatY_t^{(j)}\}_{j\in[k]}$; proxy losses $\{\hath_{t,j}\}_{j\in[k]}$; target error $\eps$; failure level $\alpha$.
+\Statex \textbf{Stage 1: Price estimation on a calibration set}
+\State Sample calibration indices $I_1,\ldots,I_m\sim\operatorname{Unif}([T])$ and collect expert labels $\{Y_{I_s}\}_{s=1}^m$.
+\State Form the empirical loss $\hatL_m(\lambda)$ \eqref{eq:empirical-cal-loss} and the level-$(1-\alpha)$ upper confidence bound $U_m(\lambda;\alpha)$ \eqref{eq:hoeffding-ucb}.
+\State Select the certified price
+       $\hat\lambda=\min\{\lambda\ge0 : U_m(\lambda;\alpha)\le\eps\}$ \eqref{eq:certified-price-selection}.
+\Statex \textbf{Stage 2: Label the pool at price $\hat\lambda$}
+\For{$t=1,\ldots,T$}
+    \State Pick the best cheap model $j_t\in\argmin_{j\in[k]}\hath_{t,j}$.
+    \State \textbf{If} $\hath_{t,j_t}\ge 1/\hat\lambda$: query expert, $\tildeY_t \gets Y_t$.
+    \State \textbf{Else}: accept cheap label, $\tildeY_t \gets \hatY_t^{(j_t)}$.
+\EndFor
+\Ensure Labels $\tildeY_1,\ldots,\tildeY_T$ with certified error $\le\eps$ at level $1-\alpha$.
 \end{algorithmic}
 \end{algorithm}
 
 
 
-\paragraph{Relation to the single-model PAC labeling}
+\paragraph{Relation to PAC labeling}
 
-{Once a candidate price $\lambda\ge0$ is fixed, the rule above reduces to the
-usual PAC-labeling threshold rule in the single-source special case.
-Indeed, with one cheap source, zero cheap-source cost, constant expert cost
-$c_E$, and a scalar proxy $\hath_t$ for cheap-source loss, the AI label is used
-exactly when
+Under the single-source case, if we use uncertainty score as the proxy, $\hath_t = U_t$, then AI label is used when
 \[
-    \lambda \hath_t < c_E,
-    \qquad\text{equivalently}\qquad
-    \hath_t < c_E/\lambda
+    \hath_t = U_t < 1/\hat\lambda.
 \]
-for $\lambda>0$.
-Thus the usual uncertainty threshold is the cost-aware threshold
-$c_E/\lambda$.
-In the proposed algorithm, $\lambda$ indexes a candidate policy and is selected
-from calibration data in Section~\ref{sec:calibration-selection}; it is not
-assumed known in advance.
-With multiple cheap sources, this scalar threshold is replaced by the
-itemwise minimum of cheap-source costs plus priced predicted losses.}
+This corresponds to the threshold policy used in the original PAC labeling method \cite{candes2025paclabels}.
+Differently, the threshold used in our method is defined by the dual price motivated from the LP perspective.
+With multiple sources, $\hath_t$ is replaced by the
+itemwise minimum of the proxy losses.
 
 
 \subsection{Offline PAC Guarantees}
-
-\subsubsection{Transductive Finite-Pool Guarantee}
 
 The transductive setting is closest to fixed-dataset PAC labeling.
 The pool $X_1,\ldots,X_T$ is fixed, and calibration indices
@@ -474,8 +377,6 @@ true loss last crosses $\eps$. A union bound over $\Lambda$ is therefore
 unnecessary, exactly as in single-source PAC labeling and in the
 Dvoretzky--Kiefer--Wolfowitz inequality, whose freedom from multiplicity
 corrections also rests on monotonicity.
-
-\subsubsection{Inductive Deployment Guarantee}
 
 \begin{corollary}[Inductive deployment guarantee]
 \label{cor:inductive-deployment}
