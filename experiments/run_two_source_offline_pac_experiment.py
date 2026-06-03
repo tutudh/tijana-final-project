@@ -20,12 +20,14 @@ Costs are c_A = c_B = 0 and c_E = 1, matching the simple offline experiment's
 notion of "budget saved = 1 - deferral rate". Under homogeneous cheap costs
 the LP dual rule reduces to: route each item to the source with the lower
 proxy loss, defer to the expert if that minimum proxy loss exceeds a single
-threshold tau = 1/lambda. The LP candidate class Lambda is therefore the same
-201-point threshold grid used in the simple offline experiment.
+threshold tau = 1/lambda. Because the cheap-source costs are equal, changing
+lambda cannot switch between sources; it only switches routed AI items to the
+expert. The routed loss is therefore monotone in the scalar threshold and does
+not need a union bound over the threshold grid.
 
 Methods compared:
-  - lp_two_source_uniform_ucb: the report's LP method, certified by a uniform
-    Hoeffding UCB over the 201 candidate thresholds.
+  - lp_two_source_monotone_ucb: the report's LP method, certified by the
+    monotone-threshold Hoeffding UCB.
   - single_A_monotone_pac and single_B_monotone_pac: the report's monotone
     baseline applied to source A or B alone, ignoring the other source.
   - best_of_singles_bonferroni: run both single-source baselines at level
@@ -52,8 +54,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 DEFAULT_DATASETS = {
-    "ImageNet": "HW4_副本/imagenet.csv",
-    "ImageNetV2": "HW4_副本/imagenetv2.csv",
+    "ImageNet": "data/imagenet.csv",
+    "ImageNetV2": "data/imagenetv2.csv",
 }
 
 
@@ -139,13 +141,13 @@ def select_lp_two_source_ucb(
     routed_mistake = np.where(sA <= sB, mA, mB)
     ai_mask = proxy_min[:, None] <= thresholds[None, :]
     empirical_loss = np.mean(ai_mask & routed_mistake[:, None], axis=0)
-    radius = np.sqrt(np.log(len(thresholds) / alpha) / (2.0 * m))
+    radius = np.sqrt(np.log(1.0 / alpha) / (2.0 * m))
     ucb = empirical_loss + radius
 
     feasible = np.flatnonzero(ucb <= epsilon)
     selected = feasible[np.argmax(full_saved[feasible])] if len(feasible) else 0
     return {
-        "method": "lp_two_source_uniform_ucb",
+        "method": "lp_two_source_monotone_ucb",
         "m": m,
         "radius": float(radius),
         "alpha_used": float(alpha),
@@ -249,7 +251,7 @@ def summarize_trials(rows):
 
 
 METHOD_DISPLAY = {
-    "lp_two_source_uniform_ucb":  ("o", "-",  "tab:blue",   "LP two-source uniform UCB"),
+    "lp_two_source_monotone_ucb": ("o", "-",  "tab:blue",   "LP two-source monotone UCB"),
     "single_A_monotone_pac":      ("s", "--", "tab:green",  "Source A monotone PAC"),
     "single_B_monotone_pac":      ("^", "--", "tab:olive",  "Source B monotone PAC"),
     "best_of_singles_bonferroni": ("D", "-.", "tab:red",    "Best-of-singles (Bonferroni)"),
@@ -281,7 +283,7 @@ def make_plot(summary, out_path):
             )
 
         oracle = (
-            sub[sub["method"] == "lp_two_source_uniform_ucb"]
+            sub[sub["method"] == "lp_two_source_monotone_ucb"]
             .sort_values("epsilon")
             .drop_duplicates(subset=["epsilon"])
         )
@@ -431,7 +433,7 @@ def parse_args():
         "--epsilons", type=float, nargs="+", default=[0.05, 0.10, 0.15],
     )
     parser.add_argument(
-        "--output-dir", default="results/two_source_offline_pac",
+        "--output-dir", default="experiments/results/two_source_offline_pac",
     )
     return parser.parse_args()
 

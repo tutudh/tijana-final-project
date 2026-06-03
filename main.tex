@@ -56,8 +56,8 @@
 \newcommand{\zwy}[1]{\textcolor{red}{\textbf{WY: #1}}}
 
 \title{Online PAC Labeling from a Linear Programming Perspective}
-\author{STATS 357 Project}
-\date{\today}
+\author{Wanyu Zhang \and Lutong Hao \and Daohong Tu}
+\date{}
 
 \begin{document}
 \maketitle
@@ -72,12 +72,8 @@ The Lagrange dual of this LP gives a scalar shadow price for error, and the
 resulting itemwise minimizer is a fixed-price routing rule over cheap sources
 and expert deferral.
 Since the oracle losses are unavailable before labeling, the implementable
-method uses proxy losses only to generate candidate prices and policies.
-Finite-sample validity is then supplied by held-out calibration labels, which
-certify the actual loss of the selected policy without requiring the proxy to
-be correct.
-This separates optimization from inference: the LP and proxy model seek cost
-efficiency, while calibration provides the PAC certificate.
+method uses proxy losses for efficient routing and held-out calibration labels
+for PAC validity.
 We also describe an audited online extension in which randomized expert audits
 produce inverse-probability feedback for updating the dual price and
 controlling finite-horizon realized error.
@@ -183,71 +179,82 @@ the dual minimization separates across items, and the action for item $t$ is giv
 The dual price $\lambda$ balances the trade-off between cost and error.
 
 \subsection{Roadmap}
-The LP perspective characterizes the optimal labeling policy by using a dual price $\lambda$. In practice, the true losses $h_t(a)$ are unknown before expert labels are observed, so the implementable method uses proxy losses $\hath_t(a)$ to generate candidate prices and policies. The finite-sample validity of the selected policy is then supplied by held-out calibration labels, which certify the actual loss of the selected policy without requiring the proxy to be correct. This separates optimization from inference: the LP and proxy model seek cost efficiency, while calibration provides the PAC certificate.
+The LP perspective suggests a one-dimensional dual price $\lambda$ for trading
+off expert cost against labeling error. Since the oracle rule depends on the
+unknown losses \(h_t(a)\), the offline method below uses proxy losses
+\(\hath_t(a)\) to build a family of price-indexed policies. The proxy may be
+obtained from a labeled training split by regression, isotonic calibration,
+multicalibration, or any other supervised procedure. The certification theorem
+below does not require \(\hath\) to be conservative or well calibrated. Better
+proxies reduce cost; held-out calibration supplies validity.
+Throughout the offline analysis, \(\hath_t(a)\) is treated as a fixed proxy
+loss for item \(X_t\) and action \(a\); it may be a deterministic function of
+\(X_t\), or the output of a model trained on an independent split before the
+target pool is calibrated.
+For simplicity, we assume throughout that the itemwise losses used in the
+argmin rules are distinct across actions; in particular, \(h_t(a)\) is different
+for different \(a\), i.e., no ties occur.
 
-In the \textbf{offline setting}, we use proxy losses $\hath_t$ to generate
-fixed-price policies and reserve a calibration sample with expert labels to
-choose $\lambda$ with a high-probability error certificate.
-The validity result does not rely on the proxy $\hath_t$ being correct, but it affects the labeling cost.
+In the \textbf{offline setting}, Section~\ref{sec:offline-certification} first
+estimates a certified price on a calibration set and then labels the target pool
+at the fixed price \(\hat\lambda\).
     
-In the \textbf{online setting}, items arrive onlinely and labels are revealed only intermittently through random audits.
+In the \textbf{online setting}, items arrive online and labels are revealed only intermittently through random audits.
 Whenever the true label is observed, we obtain feedback about the realized
 loss $h_t$ and update the price $\lambda_t$ through an online dual update.
 
 \section{Offline PAC Labeling}
 \label{sec:offline-certification}
 
-In this section, we first define the proxy-price labeling policies and then
-use a labeled calibration set to select a certified price for the target pool.
+In this section, the offline procedure follows the operational order of the
+algorithm. First, we use a labeled calibration sample to select a certified
+price \(\hat\lambda\). Then we label the full target pool using the fixed price
+\(\hat\lambda\).
 
+\subsection{Price Estimation on a Calibration Set}
+\label{sec:calibration-selection}
 
-
-
-
-\subsection{Labeling with Proxy Losses}
-\label{sec:proxy-estimation}
-
-For a candidate price $\lambda$, the oracle action $a_t(\lambda)$ from
-\eqref{eq:true-price-action} cannot be computed because $h_t(a)$ is unknown.
-We therefore choose actions by replacing $h_t(a)$ with a proxy loss
-$\hath_t(a)$.
-
-The proxy may be obtained from a labeled training split by regression,
-isotonic calibration, multicalibration, or any other supervised procedure.
-The certification theorem below does not require $\hat h$ to be
-conservative or well calibrated.
-Better proxies reduce cost; held-out calibration supplies validity.
-
-Given proxy $\hath_t(a)$, the implementable rule is the plug-in version of
-\eqref{eq:true-price-action}:
+For price estimation, we form the plug-in policy family by replacing the
+unknown loss \(h_t(a)\) in \eqref{eq:true-price-action} with the fixed proxy loss
+\(\hath_t(a)\).
+In the equal-cost setting \(c_t(j)=0\) and \(c_t(E)=1\), the chosen cheap
+source is independent of \(\lambda\): first set
+\begin{equation}
+    j_t^\lambda=j_t^\star
+    \in \argmin_{j\in[k]}\hath_{t}(j),
+    \qquad
+    s_t=\hath_t(j_t^\star)=\min_{j\in[k]}\hath_t(j).
+    \label{eq:proxy-j-star}
+\end{equation}
+The price \(\lambda\) then only decides whether to accept this routed cheap
+label or defer to the expert:
+\begin{equation}
+    D_t^\lambda
+    =
+    \ind{s_t\ge 1/\lambda},
+    \qquad
+    a_t^\lambda
+    =
+    \begin{cases}
+        E, & D_t^\lambda=1,\\
+        j_t^\star, & D_t^\lambda=0,
+    \end{cases}
+    \label{eq:proxy-action}
+\end{equation}
+with the conventions \(1/0=\infty\) and \(1/\infty=0\).
+Equivalently,
 \[
     a_t^\lambda
     \in
     \argmin_{a\in\calA}
     \{c_t(a)+\lambda\hath_t(a)\}.
 \]
-Equivalently, the update rule first chooses the model with the lowest proxy loss,
-\begin{equation}
-    j_t^\lambda \in \argmin_{j\in[k]} \hath_{t}(j),
-    \label{eq:proxy-j-star}
-\end{equation}
-then defers to the expert if and only if $\hath_{t}(j_t^\lambda)\ge 1/\lambda$. Denote $D_t^\lambda = \ind{\hath_{t}(j_t^\lambda)\ge 1/\lambda}$; then the action is
-\begin{equation}
-    a_t^\lambda
-    =
-    \begin{cases}
-        E, & D_t^\lambda=1,\\
-        j_t^\lambda, & D_t^\lambda=0.
-    \end{cases}
-    \label{eq:proxy-action}
-\end{equation}
-
 The realized labeling loss and the cost given a price $\lambda$ are then
 \begin{equation}
     H_t(\lambda)
     =
     (1-D_t^\lambda)
-    \ell\bigl(Y_t,\hatY_t^{(j_t^\lambda)}\bigr),\qquad 
+    \ell\bigl(Y_t,\hatY_t^{(j_t^\star)}\bigr),\qquad 
     C_t(\lambda)
     =
     D_t^\lambda.
@@ -261,11 +268,13 @@ Then the average loss and cost of the price-$\lambda$ policy are
     C_T(\lambda)=\frac1T\sum_{t=1}^T C_t(\lambda).
     \label{eq:L-C-lambda}
 \end{equation}
+Here \(C_T(\lambda)\) is known from the proxies and costs, while
+\(L_T(\lambda)\) depends on true labels. The calibration set is used exactly to
+estimate this loss.
 
-\subsection{Price Estimation on A Calibration Set}
-\label{sec:calibration-selection}
-
-We sample a calibration set $I_1,\ldots,I_m$, define the empirical
+We sample calibration indices \(I_1,\ldots,I_m\) independently and uniformly
+from the target pool, with replacement, and collect the corresponding expert
+labels. Define the empirical
 labeling loss
 \begin{equation}
     \hatL_m(\lambda)
@@ -273,8 +282,8 @@ labeling loss
     \frac1m\sum_{s=1}^m H_{I_s}(\lambda).
     \label{eq:empirical-cal-loss}
 \end{equation}
-Because $\hatL_m(\lambda)$ is monotone in $\lambda$, certifying the entire
-family costs no more than certifying a single price. We use the Hoeffding bound to give a level-$(1-\alpha)$ upper confidence bound on $L_T(\lambda)$,
+For any fixed \(\lambda\), Hoeffding's inequality gives a one-sided upper
+confidence bound on \(L_T(\lambda)\):
 \begin{equation}
     U_m(\lambda;\alpha)
     =
@@ -283,7 +292,12 @@ family costs no more than certifying a single price. We use the Hoeffding bound 
     \sqrt{\frac{\log(1/\alpha)}{2m}}.
     \label{eq:hoeffding-ucb}
 \end{equation}
-Then the price can be estimated by solving the offline LP dual problem with the confidence upper bound $U_m(\lambda;\alpha)$ in place of the true loss $L_T(\lambda)$:
+We do not need a union bound over \(\lambda\) here: as \(\lambda\) increases,
+the threshold \(1/\lambda\) decreases, so each item can only move from the
+routed AI model to the expert and cannot switch between cheap models. Thus
+\(H_t(\lambda)\) is non-increasing and \(C_t(\lambda)\) is non-decreasing in
+\(\lambda\).
+The certified price is
 \begin{equation}
     \hat\lambda
     =
@@ -294,7 +308,24 @@ falling back to the expert-only policy $\lambda=\infty$ if no finite price
 qualifies. Because $C_T(\lambda)$ is non-decreasing and $U_m(\lambda;\alpha)$
 non-increasing in $\lambda$, \eqref{eq:certified-price-selection} coincides with
 the cost-minimizing selection
-$\argmin_{\lambda}\{C_T(\lambda):U_m(\lambda;\alpha)\le\eps\}$.
+$\argmin_{\lambda\in[0,\infty]}\{C_T(\lambda):U_m(\lambda;\alpha)\le\eps\}$.
+
+\subsection{Labeling the Pool at Price \texorpdfstring{$\hat\lambda$}{lambda-hat}}
+\label{sec:proxy-estimation}
+
+After calibration, the price is fixed. The final labeling rule is the plug-in
+dual rule at \(\hat\lambda\):
+\[
+    a_t^{\hat\lambda}
+    \in
+    \argmin_{a\in\calA}
+    \{c_t(a)+\hat\lambda\hath_t(a)\}.
+\]
+In the equal-cost form this rule is especially simple. For each target item,
+compute \(j_t^\star\) and \(s_t\) from \eqref{eq:proxy-j-star}. If
+\(s_t\ge1/\hat\lambda\), query the expert and release \(\tildeY_t=Y_t\).
+Otherwise, accept the routed cheap label and release
+\(\tildeY_t=\hatY_t^{(j_t^\star)}\).
 
 The overall offline labeling algorithm is summarized in Algorithm~\ref{alg:offline-fixed-price}.
 
@@ -304,7 +335,7 @@ The overall offline labeling algorithm is summarized in Algorithm~\ref{alg:offli
 \begin{algorithmic}[1]
 \Require Unlabeled pool $X_1,\ldots,X_T$; cheap predictions $\{\hatY_t^{(j)}\}_{j\in[k]}$; proxy losses $\{\hath_{t}(j)\}_{j\in[k]}$; target error $\eps$; failure level $\alpha$.
 \Statex \textbf{Stage 1: Price estimation on a calibration set}
-\State Sample calibration indices $I_1,\ldots,I_m\sim\operatorname{Unif}([T])$ and collect expert labels $\{Y_{I_s}\}_{s=1}^m$.
+\State Sample calibration indices $I_1,\ldots,I_m\stackrel{\mathrm{i.i.d.}}{\sim}\operatorname{Unif}([T])$ and collect expert labels $\{Y_{I_s}\}_{s=1}^m$.
 \State Form the empirical loss $\hatL_m(\lambda)$ \eqref{eq:empirical-cal-loss} and the level-$(1-\alpha)$ upper confidence bound $U_m(\lambda;\alpha)$ \eqref{eq:hoeffding-ucb}.
 \State Select the certified price
        $\hat\lambda=\min\{\lambda\ge0 : U_m(\lambda;\alpha)\le\eps\}$ \eqref{eq:certified-price-selection}.
@@ -335,11 +366,12 @@ itemwise minimum of the proxy losses.
 \subsection{Offline PAC Guarantees}
 
 
-\begin{theorem}[Offline PAC guarantee]
+\begin{theorem}[Offline monotone-threshold PAC guarantee]
 \label{thm:offline-fixed-price-pac}
-Suppose the proxy $\hath$ is independent of the calibration labels. Let $\hat\lambda$ be selected by
-\eqref{eq:certified-price-selection}. Then, with probability at least $1-\alpha$
-over the draw of the calibration indices, the labeling algorithm produce approximately correct labels
+Let \(\hat\lambda\) be
+selected over \([0,\infty]\) by \eqref{eq:certified-price-selection}. Then,
+with probability at least \(1-\alpha\) over the draw of the calibration
+indices, the released labels satisfy
 \begin{equation}
     \frac1T\sum_{t=1}^T \ell(Y_t,\tildeY_t)\le\eps.
     \label{eq:offline-pac-guarantee}
@@ -347,9 +379,8 @@ over the draw of the calibration indices, the labeling algorithm produce approxi
 \end{theorem}
 
 \noindent
-The proof is in Appendix~\ref{app:proofs}. Validity comes entirely from the
-held-out calibration labels and is independent of the quality of the proxy; the
-selected price needs no correction for the search over $\lambda$.
+The proof is in Appendix~\ref{app:proofs}. The same calibration idea also gives
+an inductive version.
 
 \begin{corollary}[Generalization guarantee]
 \label{cor:inductive-deployment}
@@ -361,21 +392,21 @@ $\lambda$, define the population risk
     \E_{(X,Y)\sim P}
     \left[
         (1-D^\lambda(X))
-        \ell\bigl(Y,\hatY^{(j^\lambda(X))}(X)\bigr)
+        \ell\bigl(Y,\hatY^{(j^\star(X))}(X)\bigr)
     \right].
 \]
-Let $\Lambda$ be a finite price grid fixed independently of the calibration
-labels, and let $\hat\lambda$ be
-selected over $\Lambda$ by \eqref{eq:certified-price-selection}.
+Assume the equal-cost monotone-threshold policy class above, and let
+\(\hat\lambda\) be selected over \([0,\infty]\) by
+\eqref{eq:certified-price-selection}.
 Then $L(\hat\lambda)\le\eps$ with probability at least $1-\alpha$.
-% Moreover, for a finite deployment pool of size $\tilde T$, with probability at least
-% $1-\alpha-\delta$,
-% \begin{equation}
-%     \frac{1}{\tilde T}\sum_{t=1}^{\tilde T} \ell(Y_t,\tildeY_t)
-%     \le
-%     \eps + \sqrt{\frac{\log(1/\delta)}{2\tilde T}}.
-%     \label{eq:inductive-realized-bound}
-% \end{equation}
+Moreover, for an independent deployment pool of size \(n\), with probability at
+least \(1-\alpha-\delta\),
+\begin{equation}
+    \frac{1}{n}\sum_{t=1}^{n} \ell(Y_t,\tildeY_t)
+    \le
+    \eps + \sqrt{\frac{\log(1/\delta)}{2n}}.
+    \label{eq:inductive-realized-bound}
+\end{equation}
 \end{corollary}
 
 \section{Online PAC Labeling via Audits}
@@ -679,191 +710,61 @@ correctness on every unaudited item.
 \label{sec:experiments}
 
 We run a small proof-of-concept study on ImageNet and ImageNetV2 using the
-confidence score already included in the data.
+confidence score already included in the data (the datasets provided for the
+last question of HW4).
 There is one cheap source, namely the model prediction, and one expert source,
-namely the ground-truth label.
-The cheap-source proxy loss is $\hath=1-\textnormal{confidence}$, the cheap
-source has zero marginal cost, and the expert has unit cost.
-All reported numbers average over 500 random trials.
-Appendix~\ref{app:experiments} gives the full sweep and implementation
-details.
+namely the ground-truth label. All reported numbers average over 500 random
+trials. Appendix~\ref{app:experiments} gives the implementation details and full
+sweeps, while Table~\ref{tab:experiment-main-results} gives representative
+results at \(\eps=0.10\). The experiments are meant to check three basic points.
 
-\paragraph{Offline calibration.}
-The offline experiment compares the fixed-price rule from Section~2 with the
-original scalar PAC threshold baseline.
-Because this experiment has only one cheap source, the fixed-price policies
-are nested uncertainty-threshold rules.
-We therefore certify the fixed-price rule with the sharper monotone confidence
-bound
-\[
-    \hat L_m(\lambda)+\sqrt{\frac{\log(1/\alpha)}{2m}},
-\]
-rather than the finite-class union bound used for general multi-source policy
-classes.
-At $\eps=0.10$, both methods have zero violations in 500 trials and nearly
-identical expert-budget savings (Table~\ref{tab:offline-main-results}).
-Figure~\ref{fig:offline-main-results} shows the same comparison across all
-three $\eps$ levels, and Table~\ref{tab:offline-full-results} gives the
-corresponding full sweep.
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{One source.} With a single cheap source, the LP fixed-price
+    rule reduces to the same scalar threshold family as the original PAC
+    labeling method. We therefore recover the original PAC behavior: at
+    \(\eps=0.10\), both methods have zero violations, and the expert-budget
+    savings are nearly identical on ImageNet and ImageNetV2
+    (Table~\ref{tab:offline-full-results}).
 
-\begin{table}[htbp]
-\centering
-\small
-\begin{tabular}{llccc}
-\toprule
-Dataset & Method & Error & Violation & Budget saved \\
-\midrule
-ImageNet & fixed-price monotone UCB & 0.0873 & 0.0000 & 0.7848 \\
-ImageNet & original PAC & 0.0879 & 0.0000 & 0.7864 \\
-ImageNetV2 & fixed-price monotone UCB & 0.0718 & 0.0000 & 0.5457 \\
-ImageNetV2 & original PAC & 0.0726 & 0.0000 & 0.5479 \\
-\bottomrule
-\end{tabular}
-\caption{Offline results at $\eps=0.10$.  ``Budget saved'' is one minus the
-fraction of items sent to the expert.}
-\label{tab:offline-main-results}
-\end{table}
+    \item \textbf{Two sources.} We then add a second cheap source to create a
+    simple routing problem. The LP rule can choose the lower-proxy source on
+    each item before deciding whether to defer to the expert. At \(\eps=0.10\),
+    it still has zero violations and saves more budget than the best calibrated
+    single-source baseline: \(0.7848\) versus \(0.4746\) on ImageNet, and
+    \(0.5457\) versus \(0.3587\) on ImageNetV2
+    (Table~\ref{tab:two-source-full-results}).
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{experiments/results/simple_offline_pac/simple_offline_pac_summary.png}
-\caption{Offline sweep over target error levels. After exploiting the
-single-source monotonicity, the fixed-price rule is nearly indistinguishable
-from the original scalar PAC baseline; the remaining gap comes from using a
-fixed threshold grid rather than the exact calibration-order threshold.}
-\label{fig:offline-main-results}
-\end{figure}
-
-\paragraph{Two-source synthetic routing.}
-The single-source experiment above is the special case in which the LP and
-the original scalar PAC threshold coincide. To stress-test the multi-source
-regime that motivates the LP formulation, we synthesize two complementary
-cheap sources from each base ImageNet table. Items are partitioned by the
-parity of the true class label. On items inside its specialty each source
-reuses the original predictor's label and confidence; on items outside its
-specialty each source emits a uniform-random label and a confidence drawn
-from $\textnormal{Uniform}[0,0.2]$, so the source is calibrated to its own
-competence. Source A's specialty is the even-class half and source B's is
-the odd-class half. Neither source dominates; standalone accuracy is
-approximately $0.39$ on ImageNet and $0.32$ on ImageNetV2, while the per-item
-oracle that picks whichever source is correct attains $0.78$ and $0.65$,
-respectively. Costs match the simple offline experiment: $c_A=c_B=0$,
-$c_E=1$, so the dual rule routes to $\argmin_j \hath_{t}(j)$ and defers when
-$\min_j \hath_{t}(j) > 1/\lambda$.
-We compare three calibrated policies. \emph{LP two-source uniform UCB} is
-the fixed-price rule of Section~\ref{sec:calibration-selection} applied to the
-constructed two-source pool, certified with the conservative finite-class
-Hoeffding bound \eqref{eq:hoeffding-ucb-uniform} over a
-$\lvert\Lambda\rvert=202$ threshold grid; we report it as a worst-case
-baseline. We emphasize, however, that with $c_A=c_B=0$ the routed loss
-\emph{is} monotone in the scalar score $\hath_t^\lambda=\min_j\hath_{t}(j)$,
-because the source map $\argmin_j\hath_{t}(j)$ does not depend on $\lambda$, so
-Theorem~\ref{thm:offline-fixed-price-pac} licenses the sharper single-price
-bound \eqref{eq:hoeffding-ucb} here as well; this replaces the
-$\sqrt{\log(\lvert\Lambda\rvert/\alpha)}$ radius by $\sqrt{\log(1/\alpha)}$ and
-is most consequential in the tight-$\eps$ regime discussed below.
-\emph{Source-$j$ monotone PAC} ($j\in\{A,B\}$) is the original PAC baseline
-restricted to one source. \emph{Best-of-singles (Bonferroni)} runs both
-single-source baselines at level $\alpha/2$ and picks the source with the
-larger empirical savings on the calibration sample, which remains a valid
-$\alpha$-PAC procedure.
+    \item \textbf{Online.} Finally, the audited online update also shows the
+    desired validity--cost tradeoff. For example, at \(\eps=0.10\) and audit
+    probability \(p=0.2\), both datasets have zero violations while saving
+    \(0.6115\) of the expert budget on ImageNet and \(0.4681\) on ImageNetV2
+    (Table~\ref{tab:online-full-results}).
+\end{enumerate}
 
 \begin{table}[htbp]
 \centering
 \small
-\begin{tabular}{llccc}
+\begin{tabular}{lllccc}
 \toprule
-Dataset & Method & Error & Violation & Budget saved \\
+Setting & Dataset & Method & Error & Violation & Budget saved \\
 \midrule
-ImageNet   & LP two-source uniform UCB    & 0.0793 & 0.0000 & \textbf{0.7645} \\
-ImageNet   & Best-of-singles (Bonferroni) & 0.0879 & 0.0000 & 0.4746 \\
-ImageNet   & Source A monotone PAC        & 0.0878 & 0.0000 & 0.4715 \\
-ImageNet   & Source B monotone PAC        & 0.0877 & 0.0000 & 0.4754 \\
-ImageNetV2 & LP two-source uniform UCB    & 0.0534 & 0.0000 & \textbf{0.4923} \\
-ImageNetV2 & Best-of-singles (Bonferroni) & 0.0720 & 0.0000 & 0.3587 \\
-ImageNetV2 & Source A monotone PAC        & 0.0727 & 0.0000 & 0.3470 \\
-ImageNetV2 & Source B monotone PAC        & 0.0730 & 0.0000 & 0.3629 \\
+One source & ImageNet & LP fixed price & 0.0873 & 0.0000 & 0.7848 \\
+One source & ImageNet & Original PAC & 0.0879 & 0.0000 & 0.7864 \\
+One source & ImageNetV2 & LP fixed price & 0.0718 & 0.0000 & 0.5457 \\
+One source & ImageNetV2 & Original PAC & 0.0726 & 0.0000 & 0.5479 \\
+\cmidrule(lr){1-6}
+Two sources & ImageNet & LP routing & 0.0873 & 0.0000 & \textbf{0.7848} \\
+Two sources & ImageNet & Best single source & 0.0879 & 0.0000 & 0.4746 \\
+Two sources & ImageNetV2 & LP routing & 0.0718 & 0.0000 & \textbf{0.5457} \\
+Two sources & ImageNetV2 & Best single source & 0.0720 & 0.0000 & 0.3587 \\
+\cmidrule(lr){1-6}
+Online & ImageNet & Audited, \(p=0.2\) & 0.0737 & 0.0000 & 0.6115 \\
+Online & ImageNetV2 & Audited, \(p=0.2\) & 0.0783 & 0.0000 & 0.4681 \\
 \bottomrule
 \end{tabular}
-\caption{Two-source synthetic routing at $\eps=0.10$. The LP method routes
-each item to the source with the lower proxy loss and certifies the routed
-average error against the union bound over the 202-threshold grid. The
-largest budget saved in each dataset is shown in bold.}
-\label{tab:two-source-main-results}
-\end{table}
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.95\textwidth]{experiments/results/two_source_offline_pac/two_source_offline_pac_summary.png}
-\caption{Two-source synthetic routing sweep. Each single source can certify
-at most its own specialty half, so the three single-source curves saturate
-near $0.55$ (ImageNet) and $0.45$ (ImageNetV2). The LP method recovers most
-of the per-item oracle envelope by routing across sources at the cost of a
-$\sqrt{\log\lvert\Lambda\rvert}$ uniform-certification radius. On ImageNetV2
-at $\eps=0.05$ that radius approaches $\eps$ itself and the LP method is
-forced into near-full deferral, illustrating where a tighter
-$\sup$-deviation bound would be needed.}
-\label{fig:two-source-main-results}
-\end{figure}
-
-At $\eps=0.10$ all four methods have zero violations in 500 trials. The LP
-rule saves roughly $0.29$ more of the expert budget on ImageNet and $0.13$
-more on ImageNetV2 than the best Bonferroni-corrected single-source baseline
-(Table~\ref{tab:two-source-main-results}).
-The gap on ImageNet is close to the LP oracle's envelope ($0.81$ saved at
-$\eps=0.10$), confirming that the per-item routing benefit dominates the
-finite-policy union-bound radius once the calibration sample is large enough.
-At $\eps=0.05$ on ImageNetV2 the order reverses: with $m=2000$ the uniform
-radius $\sqrt{\log(202/\alpha)/(2m)}\approx 0.046$ leaves almost no headroom
-under $\eps=0.05$, so the LP rule certifies near-zero savings while each
-single-source baseline still certifies its specialty half
-(Figure~\ref{fig:two-source-main-results}; Table~\ref{tab:two-source-full-results}
-in the appendix reports the full sweep). With equal cheap-source costs this
-gap is removed rather than merely shrunk: the routed loss is monotone in the
-unidimensional statistic $\hath_t^\lambda=\min_j\hath_{t}(j)$, so
-Theorem~\ref{thm:offline-fixed-price-pac} certifies with the single-price
-radius $\sqrt{\log(1/\alpha)/(2m)}$ and pays no
-$\sqrt{\log\lvert\Lambda\rvert}$ penalty. The uniform-UCB numbers above are
-therefore a conservative baseline; the monotone certificate recovers the
-headroom lost at small $\eps$. (A variance-adaptive Bernstein bound would
-tighten the constant further; we leave that to future work.)
-
-\paragraph{Online audited routing.}
-The online experiment uses a random stream order and the dual-price update in
-Section~3 with audit probabilities $p\in\{0.1,0.2,0.5\}$.
-The update follows the intermittent-feedback form: an unaudited AI decision
-does not move the price, while an expert deferral is treated as an observed
-zero-loss event.
-These runs set the internal online target to $\eps_0=\eps$, so they are a
-behavioral check of the audited update rather than a theorem-tight
-slack-adjusted implementation of Corollary~\ref{cor:online-pac-tuning}.
-Lower audit rates save more expert budget but leave less correction, so final
-error is closer to the target.
-At $\eps=0.10$, ImageNet has no final-error violations for all three audit
-rates; ImageNetV2 has a small violation rate at $p=0.1$ and none at
-$p\ge0.2$ (Table~\ref{tab:online-main-results}; the full sweep across
-$\eps\in\{0.05,0.10,0.15\}$ is in
-Table~\ref{tab:online-full-results}).
-
-\begin{table}[htbp]
-\centering
-\small
-\begin{tabular}{lccccc}
-\toprule
-Dataset & $p$ & Final error & AI error & Violation & Budget saved \\
-\midrule
-ImageNet & 0.1 & 0.0780 & 0.0866 & 0.0000 & 0.6629 \\
-ImageNet & 0.2 & 0.0737 & 0.0921 & 0.0000 & 0.6115 \\
-ImageNet & 0.5 & 0.0490 & 0.0981 & 0.0000 & 0.3952 \\
-ImageNetV2 & 0.1 & 0.0863 & 0.0958 & 0.0400 & 0.5091 \\
-ImageNetV2 & 0.2 & 0.0783 & 0.0979 & 0.0000 & 0.4681 \\
-ImageNetV2 & 0.5 & 0.0499 & 0.0996 & 0.0000 & 0.3010 \\
-\bottomrule
-\end{tabular}
-\caption{Online audited results at $\eps=0.10$.  ``AI error'' is the
-counterfactual average error of AI-labeled items before audit correction;
-``Final error'' is after audited items are corrected by the expert.}
-\label{tab:online-main-results}
+\caption{Representative results at \(\eps=0.10\). Full sweeps and
+implementation details are deferred to Appendix~\ref{app:experiments}.}
+\label{tab:experiment-main-results}
 \end{table}
 
 \section{Discussion}
@@ -885,7 +786,7 @@ estimate.
 This gives finite-horizon error control, but not a cost-regret comparison to
 the offline oracle LP.
 The experiments in Section~\ref{sec:experiments} illustrate this distinction:
-offline calibration gives a clean finite-policy certificate, while the online
+offline calibration gives a clean held-out certificate, while the online
 mechanism exposes an explicit audit-cost versus correction tradeoff.
 The main empirical limitation is that the current data contain only one cheap
 source.
@@ -893,6 +794,7 @@ A stronger test of the LP perspective would use several cheap sources with
 heterogeneous costs, where the original scalar threshold structure no longer
 captures the routing problem.
 
+\clearpage
 \appendix
 
 \section{Related Work}
@@ -1020,71 +922,116 @@ Therefore strong duality holds by finite-dimensional linear programming
 duality.
 
 \paragraph{Proof of Theorem~\ref{thm:offline-fixed-price-pac}.}
-Condition on the target pool and the proxy; since $\hath$ does not use the
-calibration labels, the routed source $j_t^\lambda\in\argmin_j\hath_{t}(j)$, the
-routed score $s_t:=\hath_{t}(j_t^\lambda)=\min_j\hath_{t}(j)$, and the routed
-losses $\ell(Y_t,\hatY_t^{(j_t^\lambda)})\in[0,1]$ are all deterministic. Under
-equal cheap-source costs the routed source does not depend on $\lambda$, so the
-price enters only through the deferral rule $D_t^\lambda=\ind{s_t\ge1/\lambda}$.
+Condition on the fixed target pool, labels, and proxy losses from the theorem.
+The routed source \(j_t^\star\in\argmin_j\hath_t(j)\), the routed score
+\(s_t=\hath_t(j_t^\star)\), and the routed loss
+\[
+    r_t=\ell(Y_t,\hatY_t^{(j_t^\star)})\in[0,1]
+\]
+are fixed. Under equal cheap-source costs the routed source does not depend on
+\(\lambda\); the price enters only through
+\[
+    D_t^\lambda=\ind{s_t\ge1/\lambda},
+    \qquad
+    H_t(\lambda)=r_t\,\ind{s_t<1/\lambda}.
+\]
+Thus as \(\lambda\) increases, each item can only move from routed to deferred,
+so \(H_t(\lambda)\), \(L_T(\lambda)\), and \(\hatL_m(\lambda)\) are
+non-increasing in \(\lambda\).
 
-\emph{Monotonicity.} As $\lambda$ increases, $1/\lambda$ decreases, so the
-deferred set $\{t:s_t\ge1/\lambda\}$ grows and the routed set
-$\{t:s_t<1/\lambda\}$ shrinks: the induced policies form a nested family. A
-deferred item contributes zero loss and a routed item contributes its fixed
-loss, so each $H_t(\lambda)=(1-D_t^\lambda)\ell(Y_t,\hatY_t^{(j_t^\lambda)})$ is
-non-increasing in $\lambda$, and hence so are $L_T(\lambda)$ and
-$\hatL_m(\lambda)$. Both change only at the finitely many breakpoints
-$\{1/s_t\}$, so it suffices to consider $\lambda$ over this finite set.
-
-\emph{Per-price validity.} For each fixed $\lambda$ the calibration draws
-$H_{I_s}(\lambda)$ are i.i.d.\ in $[0,1]$ with mean $L_T(\lambda)$, so Hoeffding's
-inequality gives the single-price bound, valid one $\lambda$ at a time,
+For each fixed \(\lambda\), the calibration draws \(H_{I_s}(\lambda)\) are
+i.i.d.\ in \([0,1]\) with mean \(L_T(\lambda)\). Hoeffding's inequality gives
 \[
     \Pp\bigl\{L_T(\lambda)>U_m(\lambda;\alpha)\bigr\}\le\alpha,
     \qquad
     U_m(\lambda;\alpha)=\hatL_m(\lambda)+\sqrt{\tfrac{\log(1/\alpha)}{2m}}.
 \]
+This is a pointwise Hoeffding statement; the next monotonicity step is what removes
+the need for a union bound over prices.
 
-\emph{Single-point reduction.} Let $\lambda^\circ$ be the largest breakpoint with
-$L_T(\lambda^\circ)>\eps$; if no such price exists then even $\lambda=0$ is
-feasible and the claim is immediate. By monotonicity every price above
-$\lambda^\circ$ is feasible, so $L_T(\hat\lambda)>\eps$ can hold only if
-$\hat\lambda\le\lambda^\circ$. On that event, since $\hat\lambda$ is the smallest
-price with $U_m(\cdot;\alpha)\le\eps$ and $U_m(\cdot;\alpha)$ is non-increasing,
-$U_m(\lambda^\circ;\alpha)\le U_m(\hat\lambda;\alpha)\le\eps$; but
-$L_T(\lambda^\circ)>\eps$ by definition. Hence the bound fails at the single fixed
-price $\lambda^\circ$, an event of probability at most $\alpha$ by single-price
-validity. Therefore $\Pp\{L_T(\hat\lambda)\le\eps\}\ge1-\alpha$.
+The equal-cost policies form a nested finite family on the fixed target pool:
+as \(\lambda\) varies over \([0,\infty]\), the routed set
+\(\{t:s_t<1/\lambda\}\) changes only when the threshold \(1/\lambda\) crosses one
+of the finitely many scores \(s_t\). Order the distinct induced policies by
+increasing \(\lambda\). If every induced policy has \(L_T(\lambda)\le\eps\), the
+claim is immediate. Otherwise, let \(\lambda^\circ\) be any price inducing the
+last policy in this order whose true loss is still above \(\eps\):
+\[
+    L_T(\lambda^\circ)>\eps,
+    \qquad
+    L_T(\lambda)\le\eps
+    \quad\text{for every later policy.}
+\]
+This \(\lambda^\circ\) is fixed conditional on the target pool and labels, not
+chosen from the calibration sample. If the selected price were bad, i.e.
+\(L_T(\hat\lambda)>\eps\), then \(\hat\lambda\) would induce a policy no later
+than \(\lambda^\circ\). Since \(U_m(\lambda;\alpha)\) is non-increasing in
+\(\lambda\),
+\[
+    U_m(\lambda^\circ;\alpha)
+    \le
+    U_m(\hat\lambda;\alpha)
+    \le
+    \eps
+    <
+    L_T(\lambda^\circ).
+\]
+Thus the bad-selection event is contained in the single fixed-price failure
+event \(\{L_T(\lambda^\circ)>U_m(\lambda^\circ;\alpha)\}\), which has
+probability at most \(\alpha\). Therefore
+\(\Pp\{L_T(\hat\lambda)\le\eps\}\ge1-\alpha\).
 
-Finally, the released label equals $\hatY_t^{(j_t^{\hat\lambda})}$ on routed items
-and $Y_t$ (zero loss) on deferred items, so
-$\frac1T\sum_t\ell(Y_t,\tildeY_t)=L_T(\hat\lambda)$, and correcting calibration
-items to their expert labels can only lower this. Integrating over the proxy
-preserves the bound. \hfill$\square$
+Finally, the released label equals \(\hatY_t^{(j_t^\star)}\) on routed items
+and \(Y_t\) on deferred items, so
+\(\frac1T\sum_t\ell(Y_t,\tildeY_t)=L_T(\hat\lambda)\). If calibration items are
+corrected to their expert labels, the realized loss only decreases. \hfill$\square$
 
 \paragraph{Proof of Corollary~\ref{cor:inductive-deployment}.}
-Fix $\lambda$. Under equal cheap-source costs the routed source $j^\lambda(X)$
-does not depend on $\lambda$ and $D^\lambda(X)=\ind{\min_j\hath(X,j)\ge1/\lambda}$
-is non-decreasing in $\lambda$, so the integrand
-$(1-D^\lambda(X))\,\ell(Y,\hatY^{(j^\lambda(X))}(X))\in[0,1]$ is non-increasing in
-$\lambda$ pointwise; hence $L(\lambda)$ is non-increasing. For each fixed
-$\lambda$ the calibration losses $H_{I_s}(\lambda)$ are i.i.d.\ in $[0,1]$ with
-mean $L(\lambda)$, so the single-price bound \eqref{eq:hoeffding-ucb} is a valid
-upper bound on $L(\lambda)$, one $\lambda$ at a time. Because $\Lambda$ is finite,
-$\lambda^\circ=\max\{\lambda\in\Lambda:L(\lambda)>\eps\}$ is attained (or no such
-price exists, in which case the claim is immediate), and the single-point
-argument of Theorem~\ref{thm:offline-fixed-price-pac}---now applied to
-$L(\lambda)$ on $\Lambda$---gives $L(\hat\lambda)\le\eps$ with probability at
-least $1-\alpha$ over the calibration sample.
-
-Condition on the calibration sample and on the event $L(\hat\lambda)\le\eps$. The
-deployment losses $\ell(Y_t,\tildeY_t)$ are then independent, bounded in $[0,1]$,
-and have conditional mean at most $L(\hat\lambda)\le\eps$, so Hoeffding's
-inequality gives
+Under equal cheap-source costs the routed source \(j^\star(X)\) does not depend
+on \(\lambda\), and
 \[
-    \frac1T\sum_{t=1}^T\ell(Y_t,\tildeY_t)
+    H_\lambda(X,Y)
+    =
+    (1-D^\lambda(X))\ell(Y,\hatY^{(j^\star(X))}(X))
+\]
+is pointwise non-increasing in \(\lambda\). Hence \(L(\lambda)=\E H_\lambda\)
+and \(\hatL_m(\lambda)\) are non-increasing. For each fixed \(\lambda\), the
+calibration losses are i.i.d.\ in \([0,1]\) with mean \(L(\lambda)\), so
+Hoeffding's fixed-price bound applies.
+
+Let \(\lambda_\star=\sup\{\lambda:L(\lambda)>\eps\}\), with the claim immediate
+if this set is empty. If \(L(\lambda_\star)>\eps\), the same single-point
+argument as in Theorem~\ref{thm:offline-fixed-price-pac} applies at
+\(\lambda_\star\). If \(L(\lambda_\star)\le\eps\), choose a deterministic
+increasing sequence \(\lambda_n\uparrow\lambda_\star\) with
+\(L(\lambda_n)>\eps\). On the bad event \(L(\hat\lambda)>\eps\), some
+\(\lambda_n\) satisfies \(\lambda_n\ge\hat\lambda\), and therefore
+\[
+    U_m(\lambda_n;\alpha)
+    \le U_m(\hat\lambda;\alpha)
+    \le \eps
+    <
+    L(\lambda_n).
+\]
+The events \(\{U_m(\lambda_n;\alpha)\le\eps\}\) are increasing in \(n\), and for
+each fixed \(n\) Hoeffding gives
+\[
+    \Pp\{U_m(\lambda_n;\alpha)\le\eps\}
     \le
-    \eps+\sqrt{\frac{\log(1/\delta)}{2T}}
+    \Pp\{U_m(\lambda_n;\alpha)<L(\lambda_n)\}
+    \le \alpha .
+\]
+Taking the limit over \(n\) gives \(L(\hat\lambda)\le\eps\) with probability at
+least \(1-\alpha\).
+
+Condition on the calibration sample and on the event \(L(\hat\lambda)\le\eps\).
+The deployment losses \(\ell(Y_t,\tildeY_t)\) are then independent, bounded in
+\([0,1]\), and have conditional mean at most \(L(\hat\lambda)\le\eps\), so
+Hoeffding's inequality gives
+\[
+    \frac1n\sum_{t=1}^n\ell(Y_t,\tildeY_t)
+    \le
+    \eps+\sqrt{\frac{\log(1/\delta)}{2n}}
 \]
 with conditional probability at least $1-\delta$. Combining the calibration and
 deployment events gives probability at least $1-\alpha-\delta$. \hfill$\square$
@@ -1231,14 +1178,14 @@ The scripts are
 For the fixed-price method, the candidate threshold grid contains the
 expert-only rule plus 201 evenly spaced confidence-loss thresholds between
 0 and 1.
-Although Section~\ref{sec:calibration-selection} states the general
-finite-policy bound, this single-source experiment uses the sharper monotone
-threshold radius
+This grid is an implementation choice for the sweep; the monotone certificate
+in Section~\ref{sec:calibration-selection} does not require prices to be
+restricted to a finite grid. The experiment uses the monotone threshold radius
 \[
     \sqrt{\frac{\log(1/\alpha)}{2m}},
 \]
-which is valid uniformly over all scalar thresholds by the same nested-class
-argument used in the original PAC baseline.
+which is valid for the selected scalar threshold by the nested-class argument
+used in Theorem~\ref{thm:offline-fixed-price-pac}.
 For each trial, the calibration indices are sampled independently and
 uniformly from the target pool with replacement, with calibration size
 $m=0.2T$.
@@ -1284,16 +1231,16 @@ by light rules.}
 
 \paragraph{Two-source implementation.}
 \texttt{run\_two\_source\_offline\_pac\_experiment.py} constructs two
-complementary cheap sources from each base ImageNet table using the
-parity-of-true-class partition described in
-Section~\ref{sec:experiments}. The construction is seeded separately from the
-trial sampler so the synthesized pool is fixed across trials; defaults are
-\texttt{--synth-seed 20260526} and \texttt{--low-conf-max 0.2}. The
+complementary cheap sources from each base ImageNet table. Items are partitioned
+by the parity of the true class label. On items inside its specialty, a source
+reuses the original predictor's label and confidence; outside its specialty, it
+emits a random label with low confidence. The construction is seeded separately
+from the trial sampler so the synthesized pool is fixed across trials; defaults
+are \texttt{--synth-seed 20260526} and \texttt{--low-conf-max 0.2}. The
 calibration grid contains the expert-only policy plus 201 evenly spaced
 thresholds on $\min_j\hath_{t}(j)$, the calibration size is $m=0.2T$, and
-$\alpha=0.05$. The LP method uses the union-bound radius
-$\sqrt{\log(\lvert\Lambda\rvert/\alpha)/(2m)}$; the single-source baselines
-use the monotone radius $\sqrt{\log(1/\alpha)/(2m)}$; the
+$\alpha=0.05$. The LP method uses the monotone radius
+$\sqrt{\log(1/\alpha)/(2m)}$; the
 Bonferroni-corrected best-of-singles baseline runs both single-source
 baselines at $\alpha/2$ each and reports the one with larger empirical
 savings on the calibration sample. Constructed-pool statistics are written
@@ -1308,32 +1255,32 @@ Table~\ref{tab:two-source-full-results}.
 \toprule
 Dataset & Method & $\eps$ & Error & Violation & Budget saved \\
 \midrule
-ImageNet   & LP two-source uniform UCB    & 0.05 & 0.0290 & 0.0000 & \textbf{0.5898} \\
+ImageNet   & LP two-source monotone UCB   & 0.05 & 0.0372 & 0.0000 & \textbf{0.6296} \\
 ImageNet   & Best-of-singles (Bonferroni) & 0.05 & 0.0372 & 0.0000 & 0.3782 \\
 ImageNet   & Source A monotone PAC        & 0.05 & 0.0378 & 0.0000 & 0.3743 \\
 ImageNet   & Source B monotone PAC        & 0.05 & 0.0378 & 0.0000 & 0.3809 \\
 \cmidrule(lr){1-6}
-ImageNet   & LP two-source uniform UCB    & 0.10 & 0.0793 & 0.0000 & \textbf{0.7645} \\
+ImageNet   & LP two-source monotone UCB   & 0.10 & 0.0873 & 0.0000 & \textbf{0.7848} \\
 ImageNet   & Best-of-singles (Bonferroni) & 0.10 & 0.0879 & 0.0000 & 0.4746 \\
 ImageNet   & Source A monotone PAC        & 0.10 & 0.0878 & 0.0000 & 0.4715 \\
 ImageNet   & Source B monotone PAC        & 0.10 & 0.0877 & 0.0000 & 0.4754 \\
 \cmidrule(lr){1-6}
-ImageNet   & LP two-source uniform UCB    & 0.15 & 0.1290 & 0.0000 & \textbf{0.8705} \\
+ImageNet   & LP two-source monotone UCB   & 0.15 & 0.1372 & 0.0000 & \textbf{0.8851} \\
 ImageNet   & Best-of-singles (Bonferroni) & 0.15 & 0.1383 & 0.0000 & 0.5296 \\
 ImageNet   & Source A monotone PAC        & 0.15 & 0.1377 & 0.0000 & 0.5273 \\
 ImageNet   & Source B monotone PAC        & 0.15 & 0.1379 & 0.0000 & 0.5299 \\
 \cmidrule(lr){1-6}
-ImageNetV2 & LP two-source uniform UCB    & 0.05 & 0.0019 & 0.0000 & 0.0936 \\
+ImageNetV2 & LP two-source monotone UCB   & 0.05 & 0.0218 & 0.0000 & \textbf{0.3642} \\
 ImageNetV2 & Best-of-singles (Bonferroni) & 0.05 & 0.0210 & 0.0000 & 0.2331 \\
 ImageNetV2 & Source A monotone PAC        & 0.05 & 0.0227 & 0.0000 & 0.2254 \\
-ImageNetV2 & Source B monotone PAC        & 0.05 & 0.0230 & 0.0000 & \textbf{0.2424} \\
+ImageNetV2 & Source B monotone PAC        & 0.05 & 0.0230 & 0.0000 & 0.2424 \\
 \cmidrule(lr){1-6}
-ImageNetV2 & LP two-source uniform UCB    & 0.10 & 0.0534 & 0.0000 & \textbf{0.4923} \\
+ImageNetV2 & LP two-source monotone UCB   & 0.10 & 0.0718 & 0.0000 & \textbf{0.5457} \\
 ImageNetV2 & Best-of-singles (Bonferroni) & 0.10 & 0.0720 & 0.0000 & 0.3587 \\
 ImageNetV2 & Source A monotone PAC        & 0.10 & 0.0727 & 0.0000 & 0.3470 \\
 ImageNetV2 & Source B monotone PAC        & 0.10 & 0.0730 & 0.0000 & 0.3629 \\
 \cmidrule(lr){1-6}
-ImageNetV2 & LP two-source uniform UCB    & 0.15 & 0.1036 & 0.0000 & \textbf{0.6250} \\
+ImageNetV2 & LP two-source monotone UCB   & 0.15 & 0.1219 & 0.0000 & \textbf{0.6648} \\
 ImageNetV2 & Best-of-singles (Bonferroni) & 0.15 & 0.1226 & 0.0000 & 0.4389 \\
 ImageNetV2 & Source A monotone PAC        & 0.15 & 0.1234 & 0.0000 & 0.4287 \\
 ImageNetV2 & Source B monotone PAC        & 0.15 & 0.1226 & 0.0000 & 0.4412 \\
@@ -1423,7 +1370,7 @@ For example, for a fixed $\lambda$, an empirical Bernstein bound gives
 \end{equation}
 where $\hat V_m(\lambda)$ is the sample variance of $H_{I_s}(\lambda)$.
 
-When the single-price no-correction argument does not apply, the candidate
+When the monotone no-grid argument does not apply, the candidate
 prices can instead be certified simultaneously by a union bound. Over a finite
 grid $\Lambda$, the uniform Hoeffding bound
 \begin{equation}
@@ -1442,8 +1389,9 @@ $\Pp\{\exists\,\lambda\in\Lambda: L_T(\lambda)>U_m^{\mathrm{unif}}(\lambda;\alph
 Under equal cheap-source costs the selected source
 $j_t^\lambda\in\argmin_j\hath_{t}(j)$ does not depend on $\lambda$, the routed
 loss is monotone in the scalar score $\min_j\hath_{t}(j)$, and
-Theorem~\ref{thm:offline-fixed-price-pac} certifies the whole price continuum
-with the single-price bound \eqref{eq:hoeffding-ucb} at level $\alpha$. Under
+Theorem~\ref{thm:offline-fixed-price-pac} certifies the price selected over the
+continuum $[0,\infty]$ with the monotone bound \eqref{eq:hoeffding-ucb} at level
+$\alpha$. Under
 unequal costs the selected source
 $j_t^\lambda\in\argmin_j\{c_t(j)+\lambda\hath_{t}(j)\}$ varies with $\lambda$, so
 source switching can make $L_T(\lambda)$ non-monotone and the single-point
@@ -1464,8 +1412,8 @@ The following observation is included only to show that a continuum of prices
 can be reduced to a finite policy class on a fixed finite dataset.
 It is relevant only under unequal cheap-source costs, where source selection
 varies with $\lambda$; under the equal-cost setting of the main text
-Theorem~\ref{thm:offline-fixed-price-pac} already certifies all prices without
-it. It is not a main contribution: the resulting confidence penalty may be
+Theorem~\ref{thm:offline-fixed-price-pac} already certifies the
+continuum-selected price without it. It is not a main contribution: the resulting confidence penalty may be
 larger than that of a deliberately chosen price grid, and it does not remove
 the uniform-certification cost.
 
@@ -1478,30 +1426,32 @@ The action selected by a fixed price is the lower envelope of the $k+1$ lines
     c_t(a)+\lambda\hath_t(a),
     \qquad a\in\{E,1,\ldots,k\}.
 \]
-With a deterministic tie-breaking rule, the action can change only when two of
-these lines cross.
+The action can change only when two of these lines cross.
 
 \begin{corollary}[Uniform certification over all prices]
 \label{cor:all-prices}
 Fix a bounded interval $[0,\lambda_{\max}]$ and include the expert-only policy
 as an additional candidate.
-Let $\Pi_{\lambda}$ be the fixed-price policy induced by
-\eqref{eq:proxy-j-star}--\eqref{eq:proxy-action} on the union of the target and
-calibration items.
+Let $\Pi_{\lambda}$ be the fixed-price policy induced by the unique minimizer
+\[
+    a_t^\lambda\in\argmin_{a\in\{E,1,\ldots,k\}}
+    \{c_t(a)+\lambda\hath_t(a)\}
+\]
+on the union of the target and calibration items.
 The number of distinct induced policies over
-$\lambda\in[0,\lambda_{\max}]$ is at most
+$\lambda\in[0,\lambda_{\max}]$ at which these minimizers are unique is at most
 \begin{equation}
     N_{\mathrm{br}}
     \le
-    1+2(T+m)\binom{k+1}{2}.
+    1+(T+m)\binom{k+1}{2}.
     \label{eq:breakpoint-count}
 \end{equation}
-Therefore the uniform guarantee holds over all
-$\lambda\in[0,\lambda_{\max}]$ after replacing $|\Lambda|$ in
+Therefore the finite-policy uniform guarantee holds over all
+\(\lambda\) with unique minimizers after replacing $|\Lambda|$ in
 \eqref{eq:hoeffding-ucb-uniform} by $N_{\mathrm{br}}$. Under equal cheap-source
 costs this enumeration is unnecessary: source selection does not depend on
 $\lambda$, $L_T$ is monotone, and Theorem~\ref{thm:offline-fixed-price-pac}
-already certifies the whole continuum with the single-price bound
+already certifies the continuum-selected price with the monotone bound
 \eqref{eq:hoeffding-ucb}.
 \end{corollary}
 
@@ -1516,15 +1466,15 @@ Across $T+m$ target and calibration items, there are therefore at most
 \]
 crossing values, counting multiplicity.
 These crossing values partition $[0,\lambda_{\max}]$ into at most $B+1$ open
-intervals, and there are at most $B$ exact crossing points.
-Within each open interval the entire vector of decisions on target and
-calibration items is fixed.
-At an exact crossing point, deterministic tie-breaking determines a single
-additional policy, which may or may not coincide with one of the neighboring
-interval policies.
-Thus the number of distinct induced policies is at most $2B+1$.
-Applying Theorem~\ref{thm:offline-fixed-price-pac} to one representative price
-from each induced policy gives the result.
+intervals. Within each open interval the entire vector of decisions on target
+and calibration items is fixed.
+Thus the number of distinct induced policies with unique minimizers is at most
+\(B+1\).
+Choose one representative price from each distinct induced policy and apply the
+finite-policy Hoeffding union bound \eqref{eq:hoeffding-ucb-uniform} to those
+representatives. Every \(\lambda\) with unique minimizers induces one of these
+representative policies, so the same uniform guarantee holds over all such
+prices.
 \end{proof}
 
 \subsection{Explicit Cost Accounting}
