@@ -1,0 +1,541 @@
+% =====================================================================
+%  Presenter notes for "Online PAC Labeling from an LP Perspective"
+%  Companion to slides.tex  (~15 minute talk)
+%
+%  Each section corresponds to one slide, in order. Bold blue cues are
+%  the spoken throughline; the "Backup" paragraphs are deeper technical
+%  detail to draw on. A final section anticipates audience questions.
+%
+%  Compile with:  pdflatex presenter_notes.tex
+% =====================================================================
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{xcolor}
+\usepackage{enumitem}
+
+\newcommand{\eps}{\varepsilon}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Pp}{\mathbb{P}}
+\newcommand{\calA}{\mathcal{A}}
+\newcommand{\calG}{\mathcal{G}}
+\newcommand{\argmin}{\operatorname*{arg\,min}}
+\newcommand{\hath}{\widehat h}
+\newcommand{\hatL}{\widehat L}
+\newcommand{\tildeY}{\widetilde Y}
+\newcommand{\hatY}{\widehat Y}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\ind}[1]{\mathbf{1}\{#1\}}
+\newcommand{\cue}[1]{\textcolor{blue!60!black}{\textbf{#1}}}
+\newcommand{\timecue}[1]{\hfill{\small\itshape(\,$\approx$#1\,)}}
+\newcommand{\backup}[1]{{\small\textcolor{black!72}{\textit{Backup --- } #1}}}
+
+\renewcommand{\thesection}{\arabic{section}}
+\renewcommand{\section}[1]{%
+  \refstepcounter{section}%
+  \par\vspace{0.6\baselineskip}%
+  {\large\bfseries\color{blue!45!black}Slide \thesection. #1}\par
+  \vspace{0.2\baselineskip}}
+\newcommand{\qsection}[1]{%
+  \par\vspace{0.7\baselineskip}%
+  {\large\bfseries\color{blue!45!black}#1}\par
+  \vspace{0.2\baselineskip}}
+\setlength{\parskip}{0.45\baselineskip}
+\setlength{\parindent}{0pt}
+
+\title{\vspace{-1.2cm}Presenter Notes\\[2pt]\large Online PAC Labeling from a Linear Programming Perspective}
+\author{Companion to \texttt{slides.tex} --- target $\approx$15 minutes}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-0.8cm}
+
+\noindent\textbf{Pacing guide.} Setup + LP (0:00--4:00), offline + results
+(4:00--11:30), online + results (11:30--14:45), takeaways (14:45--15:00).
+Slide-by-slide parenthetical times are \emph{cumulative} targets. If running
+long, compress the dual derivation (Slide 5) and the proof sketches (Slides 9,
+14) and lean on the figures --- those are the parts an audience can skip without
+losing the thread.
+
+\noindent\textbf{The one-sentence thesis} (keep returning to it): \emph{a single
+LP dual variable $\lambda$ --- the ``price of error'' --- unifies offline
+certification and online auditing, and proxies only ever affect cost, never the
+error guarantee.}
+
+% --------------------------------------------------------------------
+\section{Title}
+\timecue{0:20}
+\cue{Open simply.} ``Our project revisits PAC labeling --- cheaply labeling a
+large dataset with a finite-sample error guarantee --- but through the lens of a
+linear program. That single change of viewpoint buys us multi-source routing and
+an online extension almost for free.'' Name the three authors, then move on.
+
+\backup{``PAC'' = probably approximately correct: the error guarantee holds with
+probability $1-\alpha$ over the calibration (offline) or audit (online)
+randomness. Our starting point is PAC labeling of Cand\`es et al.\ (2025); our
+contribution is the optimization-first framing, item/source-specific costs, and
+the audited online extension.}
+
+% --------------------------------------------------------------------
+\section{The problem: labeling a big pool, cheaply}
+\timecue{1:30}
+\cue{Set the stakes.} We have a fixed pool of $T$ unlabeled items
+$X_1,\dots,X_T$ with unknown true labels $Y_1,\dots,Y_T$, and we must release a
+label for \emph{every} item. Two ways to get a label: $k$ cheap ML models (free
+but fallible) or a human \textbf{expert} (treated as ground truth, but
+expensive). We want to lean on the AI as much as possible while
+\emph{certifying} that the average error of the released dataset is below a
+user-chosen target $\eps$.
+
+\cue{State the tension --- it organizes the whole talk.} More AI lowers cost;
+more expert lowers error. Everything that follows is about navigating that
+frontier \emph{with a guarantee}, not just a heuristic. The headline numbers to
+foreshadow: at a 10\% error target we skip the expert on roughly 78\% of
+ImageNet items.
+
+\cue{Why ``LP''?} Because the trade-off is literally a constrained
+cost-minimization: minimize expert queries subject to an error budget. Writing
+it as an LP and taking the dual is what collapses a $T\times(k{+}1)$ decision
+problem down to tuning one scalar.
+
+% --------------------------------------------------------------------
+\section{Setup and notation}
+\timecue{3:00}
+\cue{Walk the two boxes.} Action set $\calA=\{E,1,\dots,k\}$: defer to the
+expert $E$, or accept one of $k$ cheap models that produce predictions
+$\hatY_t^{(j)}$. Two item-wise primitives:
+\[
+   h_t(a)=\begin{cases}0,&a=E\\ \ell(Y_t,\hatY_t^{(a)}),&a\in[k]\end{cases}
+   \qquad
+   c_t(a)=\begin{cases}1,&a=E\\ 0,&a\in[k].\end{cases}
+\]
+\cue{Emphasize the asymmetry --- it drives every later simplification.} The
+expert has zero loss but unit cost; cheap models have zero cost but possibly
+positive loss. The labeling loss $\ell$ is bounded and normalized to $[0,1]$.
+The released label is $\tildeY_t=Y_t$ when we defer, else $\hatY_t^{(a_t)}$.
+
+\backup{The unit/zero cost split is the ``equal cheap-source cost'' regime
+($c_t(j)=0$ for all $j$, $c_t(E)=1$). The \emph{LP itself} permits item- and
+source-specific costs; we specialize to equal costs because that is what makes
+$L_T(\lambda)$ monotone and what the data supports. Unequal costs come back in
+the limitation slide and in the Q\&A.}
+
+% --------------------------------------------------------------------
+\section{The cost-aware LP}
+\timecue{4:00}
+\cue{Read the LP in words, not symbols.} Decision variable
+$x_{t,a}\in[0,1]$ is the probability of taking action $a$ on item $t$. We
+\emph{minimize average cost} $\frac1T\sum_{t,a}c_t(a)x_{t,a}$ subject to: (i) the
+\emph{average error budget} $\frac1T\sum_{t,a}h_t(a)x_{t,a}\le\eps$; (ii) each
+item's probabilities sum to one; (iii) nonnegativity.
+
+\cue{Two things to stress.} First: there is exactly \emph{one} coupling
+constraint --- the global error budget --- and that single coupling is what
+makes the dual one-dimensional. Everything else is per-item (a simplex). Second:
+this is the \emph{oracle} LP --- if the true losses $h_t(a)$ were known, its
+solution \emph{is} the optimal labeling policy. The rest of the talk is about not
+knowing $h_t(a)$ and plugging in proxies $\hath_t(a)$.
+
+\backup{The LP is a continuous relaxation, but its optimum is attained at a
+vertex, so the per-item solution is essentially deterministic (an item is
+routed, deferred, or sits exactly at a threshold). This is why the eventual rule
+is a hard threshold, not a randomized mixture.}
+
+% --------------------------------------------------------------------
+\section{The dual / price of error}
+\timecue{5:00}
+\cue{This is the conceptual heart --- slow down here.} Put a single multiplier
+$\lambda\ge0$ on the error constraint. The reduced dual is the one-dimensional
+\emph{concave} maximization
+\[
+   \max_{\lambda\ge0}\;D(\lambda):=-\lambda\eps
+     +\frac1T\sum_{t=1}^{T}\min_{a\in\calA}\{c_t(a)+\lambda\,h_t(a)\}.
+\]
+The structural payoff: \emph{for fixed $\lambda$ the inner minimization
+separates across items}, giving the fixed-price rule
+$a_t(\lambda)\in\argmin_a\{c_t(a)+\lambda h_t(a)\}$.
+
+\cue{Interpretation to say out loud.} $\lambda$ is a shadow price --- the
+exchange rate between a unit of cost and a unit of error. Push $\lambda$ up and
+error becomes ``expensive,'' so we defer more; push it down and we trust the AI.
+A high-dimensional policy collapses to tuning one scalar.
+
+\backup{Dual derivation if pressed: introduce $\lambda\ge0$ for the error
+constraint and a \emph{free} multiplier $\mu_t\in\R$ for each simplex equality;
+keep $x\ge0$ as the domain. Linearity in each $x_{t,a}$ forces the dual
+feasibility condition $\mu_t\le\frac1T\{c_t(a)+\lambda h_t(a)\}$ for all $a$ (else
+the inner inf is $-\infty$). The objective increases in each $\mu_t$, so
+optimally $\mu_t^\star(\lambda)=\frac1T\min_a\{c_t(a)+\lambda h_t(a)\}$, which
+substitutes to give $D(\lambda)$. Strong duality holds: the primal is feasible
+(defer everything $\Rightarrow$ zero error) and bounded (costs $\ge0$), so
+finite-dimensional LP duality applies. We assume losses in the argmin are
+distinct so ties don't occur.}
+
+% --------------------------------------------------------------------
+\section{Threshold form}
+\timecue{6:00}
+\cue{Make the rule concrete --- this is the rule we actually run.} Under equal
+cheap costs the chosen cheap model doesn't depend on $\lambda$, so the rule
+factors into two steps. \textbf{Step 1, route:} pick the best cheap model
+$j_t^\star\in\argmin_j\hath_t(j)$ and read off its score
+$s_t=\min_j\hath_t(j)$ --- think of $s_t$ as an ``uncertainty.'' \textbf{Step 2,
+threshold:} $\lambda$ only sets a cutoff $1/\lambda$:
+\[
+   s_t\ge 1/\lambda \;\Rightarrow\; \text{defer to expert},\qquad
+   s_t< 1/\lambda \;\Rightarrow\; \text{accept the routed cheap label}.
+\]
+
+\cue{The payoff line.} With a single source and $\hath_t=$ uncertainty, this is
+\emph{exactly} the original PAC-labeling threshold family. Multiple sources cost
+nothing extra --- the score just becomes $\min_j\hath_t(j)$. And the very same
+scalar will be \emph{fixed once} offline or \emph{moved over time} online ---
+that's the fork in the talk.
+
+\backup{We replace the unknown true loss by a proxy $\hath_t(a)$ --- an
+uncertainty score, a calibrated error estimate, anything \emph{predictable} from
+past audits and current non-expert info. Crucially proxies need \emph{not} be
+calibrated or conservative: a better proxy improves cost, while held-out
+calibration provides validity. In the experiments $\hath=1-\text{confidence}$.}
+
+% --------------------------------------------------------------------
+\section{Part I divider --- Offline}
+\timecue{6:15}
+\cue{One sentence.} ``In the offline case the whole pool is in front of us: we
+spend a handful of expert labels to \emph{certify} one price, then label
+everything at that fixed price.''
+
+% --------------------------------------------------------------------
+\section{Offline calibration}
+\timecue{8:00}
+\cue{The split that makes it work.} Decompose the price-$\lambda$ policy into its
+realized loss $H_t(\lambda)=(1-D_t^\lambda)\,\ell(Y_t,\hatY_t^{(j_t^\star)})$ and
+cost $C_t(\lambda)=D_t^\lambda$. The average \emph{cost} $C_T(\lambda)$ is fully
+known from proxies and costs --- no labels needed. Only the average \emph{error}
+$L_T(\lambda)=\frac1T\sum_t H_t(\lambda)$ needs true labels, so that is the one
+thing we estimate. That is precisely what the calibration set buys.
+
+\cue{Three steps.} (1) Sample $m$ calibration indices i.i.d.\ uniformly from the
+pool (with replacement), pay for their expert labels, and form the empirical
+loss $\hatL_m(\lambda)=\frac1m\sum_s H_{I_s}(\lambda)$. (2) Add a Hoeffding slack
+for a one-sided upper confidence bound
+$U_m(\lambda;\alpha)=\hatL_m(\lambda)+\sqrt{\log(1/\alpha)/2m}$. (3) Pick the
+\emph{cheapest certified price}
+$\hat\lambda=\min\{\lambda\ge0:U_m(\lambda;\alpha)\le\eps\}$, falling back to
+expert-only ($\lambda=\infty$) if none qualifies.
+
+\cue{Why we pay no union-bound tax --- this is the slick part.} As $\lambda$
+increases, the threshold $1/\lambda$ \emph{decreases}, so each item can only move
+from AI to expert, never between two cheap models. Hence $H_t(\lambda)$ is
+non-increasing and $C_t(\lambda)$ non-decreasing in $\lambda$: the policies form
+one \emph{nested, monotone} family. A single pointwise Hoeffding bound, placed at
+the relevant crossing price, certifies the entire continuum --- no grid, no
+$\log|\Lambda|$ penalty. Because $U_m$ is non-increasing and $C_T$
+non-decreasing, the ``cheapest certified price'' is also the cost-minimizer.
+
+\backup{Implementation: $m=0.2T$, $\alpha=0.05$, $\eps\in\{0.05,0.10,0.15\}$.
+The sweep uses a grid (expert-only plus 201 evenly spaced thresholds) purely for
+plotting --- the monotone certificate needs no grid. The original-PAC baseline
+uses the same calibration sample and the same radius
+$\sqrt{\log(1/\alpha)/2m}$ but picks its threshold from the calibration mistake
+ordering rather than a grid.}
+
+% --------------------------------------------------------------------
+\section{Offline guarantee}
+\timecue{9:00}
+\cue{State the theorem plainly.} With probability $\ge1-\alpha$ over the
+calibration draw, the realized average error on the \emph{whole} pool satisfies
+$\frac1T\sum_t\ell(Y_t,\tildeY_t)\le\eps$. Finite-sample, distribution-free, and
+it safely falls back to expert-only when no finite price qualifies.
+
+\cue{Proof intuition in one breath.} Order the finitely many distinct policies by
+$\lambda$. Let $\lambda^\circ$ be the last (fixed, data-independent) policy whose
+\emph{true} loss still exceeds $\eps$. A bad selection $L_T(\hat\lambda)>\eps$
+forces $\hat\lambda$ to land no later than $\lambda^\circ$; since $U_m$ is
+non-increasing, $U_m(\lambda^\circ)\le U_m(\hat\lambda)\le\eps<L_T(\lambda^\circ)$.
+So the bad event is contained in a \emph{single} fixed-price Hoeffding failure
+$\{L_T(\lambda^\circ)>U_m(\lambda^\circ)\}$, which has probability $\le\alpha$.
+Monotonicity is doing all the work --- that's why no union bound.
+
+\cue{Generalization corollary --- mention briefly.} If calibration is i.i.d.\
+from a distribution $P$, the \emph{population} risk at $\hat\lambda$ is $\le\eps$
+w.p.\ $1-\alpha$; and on a fresh deployment pool of size $n$ the realized error
+is $\le\eps+\sqrt{\log(1/\delta)/2n}$ w.p.\ $1-\alpha-\delta$. \cue{Repeat the
+slogan:} proxies move cost, not validity --- a worse proxy just defers more
+often.
+
+% --------------------------------------------------------------------
+\section{Offline experiment 1 --- one source}
+\timecue{10:30}
+\cue{Setup in a breath.} Two ImageNet prediction tables --- ImageNet
+($T=50{,}000$) and ImageNetV2 ($T=10{,}000$) --- each with a ground-truth label,
+a model prediction, and a confidence. Cheap source = the model prediction,
+expert = ground truth, proxy loss $\hath=1-\text{confidence}$. Every number is
+an average over \textbf{500 random trials}; the slide shows $\eps=0.10$.
+
+\cue{Read the table left to right.} LP fixed-price vs.\ original PAC: error
+$0.0873$ vs.\ $0.0879$ on ImageNet, budget saved $0.7848$ vs.\ $0.7864$ ---
+essentially identical, with the \emph{violation column exactly zero}. That is the
+sanity check: with one source the LP rule \emph{is} PAC, exactly as Slide 6
+predicts. We skip the expert on $\sim$78\% of ImageNet items, $\sim$55\% on the
+harder ImageNetV2.
+
+\cue{Point at the figure.} Across $\eps\in\{0.05,0.10,0.15\}$ the two methods'
+budget-saved and realized-error curves sit on top of each other; realized error
+hugs --- and stays under --- the gray target line. Higher $\eps$ buys more
+savings (0.63 $\to$ 0.79 $\to$ 0.89 on ImageNet).
+
+% --------------------------------------------------------------------
+\section{Offline experiment 2 --- two sources}
+\timecue{11:30}
+\cue{This is the slide that justifies the LP framing --- give it weight.} The
+real data has only one genuine source, so we \emph{synthesize} two complementary
+ones: partition items by the parity of the true class, and let each source reuse
+the original predictor on its specialty half while emitting a random
+low-confidence label off it. The pool is fixed across trials. Now per-item
+routing genuinely matters.
+
+\cue{The contrast --- the money numbers.} At $\eps=0.10$ on ImageNet, LP routing
+saves \textbf{0.7848} of the expert budget versus \textbf{0.4746} for the
+best single source --- and that baseline is already given a fair shake via a
+Bonferroni correction (run both singles at $\alpha/2$, keep the better). Same
+error control (violation $=0$), but the LP picks the right source per item and
+defers far less. The pattern holds across $\eps$ and on ImageNetV2 (0.5457 vs.\
+0.3587 at $\eps=0.10$).
+
+\cue{Takeaway line.} ``A scalar threshold on a single source leaves a lot of
+budget on the table; the LP recovers it by routing first, then thresholding.''
+
+\backup{The monotone certificate still applies because, under equal costs, the
+routed source $j_t^\star=\argmin_j\hath_t(j)$ doesn't depend on $\lambda$ --- the
+score is just $\min_j\hath_t(j)$ and the policy is still nested in $\lambda$. The
+grid here is 201 thresholds on $\min_j\hath_t(j)$ plus expert-only; same
+$m=0.2T$, $\alpha=0.05$.}
+
+% --------------------------------------------------------------------
+\section{Part II divider --- Online}
+\timecue{11:45}
+\cue{One sentence.} ``Now items stream in one at a time, and an AI label's true
+error is invisible unless we pay to audit it --- so we can no longer certify a
+fixed price up front; the price has to \emph{move}.''
+
+% --------------------------------------------------------------------
+\section{Online setup + audited feedback}
+\timecue{13:00}
+\cue{Describe the loop concretely.} At round $t$ we see $X_t$, the cheap labels,
+and \emph{predictable} proxies $\hath_t(j)$. Route to the lowest-proxy model,
+then threshold with the \emph{current} price: defer iff
+$\lambda_t\hath_t^\lambda\ge1$, i.e.\ $\hath_t^\lambda\ge1/\lambda_t$. If we keep
+the AI label we \textbf{audit} it with probability $p_t\in[p_{\min},1]$ ---
+$A_t\sim\text{Bernoulli}(p_t)$, drawn \emph{before} we see the label. If audited,
+we query the expert, \emph{correct} the released label to $Y_t$, and observe the
+AI's counterfactual error.
+
+\cue{The one technical idea: inverse-probability weighting.} Audits are rare, so
+to keep the update unbiased we up-weight an observed AI error by $1/p_t$. Writing
+the observation mask $O_t=D_t+(1-D_t)A_t$ and its probability
+$q_t=D_t+(1-D_t)p_t$, the centered signal is
+$\widehat Z_t=\frac{O_t}{q_t}(H_t-\eps_0)$, and
+$\E[\widehat Z_t\mid\calG_t]=H_t-\eps_0$ --- \emph{unbiased} for the true AI loss
+minus an internal target $\eps_0$, despite seeing labels only intermittently.
+That unbiasedness is the linchpin of the whole online guarantee.
+
+\backup{Three concrete cases for $\widehat Z_t$: $-\eps_0$ on a deferral
+(expert used, $H_t=0$); $(\ell_t-\eps_0)/p_t$ on an audited AI label; $0$ on an
+unaudited AI label. Predictability (Assumption 1) means routing, $p_t$, and the
+selected source use only past + current non-expert information; given that
+pre-audit $\sigma$-field $\calG_t$, $A_t$ is independent Bernoulli$(p_t)$. The
+unbiasedness is Proposition 1: $\E[O_t/q_t\mid\calG_t]=1$ in both the deferral
+($1/1$) and AI ($p_t/p_t$) cases.}
+
+% --------------------------------------------------------------------
+\section{Online update + guarantee}
+\timecue{14:15}
+\cue{The update is one-line dual ascent.}
+$\lambda_{t+1}=[\lambda_t+\eta\widehat Z_t]_+$. Narrate the sign of the feedback:
+an audited \emph{mistake} raises $\lambda$, which lowers the threshold
+$1/\lambda$ and makes future routing more cautious; a deferral or a clean audit
+lowers $\lambda$ and trusts the AI more. The internal target $\eps_0\le\eps$
+deliberately leaves slack for the finite-horizon term.
+
+\cue{The theorem, in words.} For \emph{any} data sequence (distribution-free;
+the only randomness is the audits), with probability $\ge1-\delta$ the realized
+final error is
+\[
+   \tfrac1T\sum_t G_t\;\le\;\tfrac1T\sum_t H_t\;\le\;
+   \eps_0+\frac{\Lambda_{\mathrm{on}}}{\eta T}
+   +\frac{1}{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}.
+\]
+The first extra term is optimization error (how fast dual ascent moves), the
+second is concentration from intermittent feedback. Both vanish as $T\to\infty$.
+\cue{The tuning corollary:} choose $\eps_0=\eps-B_T$ where $B_T$ is the slack;
+with $\eta\asymp T^{-1/2}$ and constant $p_{\min}$, $B_T=O(T^{-1/2})$, so final
+error $\le\eps$. Note this controls \emph{realized error}, not regret against an
+offline oracle.
+
+\backup{Proof sketch (only if asked): (i) the price is bounded,
+$0\le\lambda_t\le\Lambda_{\mathrm{on}}$ --- once $\lambda_t\ge1/\rho$ the proxy
+floor $\hath_t\ge\rho$ forces $\lambda_t\hath_t\ge1$, i.e.\ a deferral, which can
+only pull $\lambda$ back down. (ii) Since $[x]_+\ge x$, telescoping gives
+$\sum_t\widehat Z_t\le\Lambda_{\mathrm{on}}/\eta$. (iii) The gap
+$M_t=(H_t-\eps_0)-\widehat Z_t$ is a martingale-difference sequence (by Prop.\ 1)
+bounded by $1/p_{\min}$, so Azuma--Hoeffding controls $\sum_t M_t$. (iv) Combine
+via $\sum_t H_t=T\eps_0+\sum_t\widehat Z_t+\sum_t M_t$, and use
+audit-and-correct's pointwise $G_t\le H_t$. Two assumptions:
+\emph{predictable routing + random audits}, and a \emph{proxy floor}
+$\hath_t(j)\in[\rho,1]$.}
+
+% --------------------------------------------------------------------
+\section{Online experiment}
+\timecue{14:45}
+\cue{One clean message: $p$ is a validity--cost knob.} Per trial we randomly
+permute the pool into a stream; settings $\eta=1$, proxy floor $\rho=0.01$,
+$\lambda_1=1/\eps$, audit rate $p\in\{0.1,0.2,0.5\}$, again 500 trials. At
+$\eps=0.10$ on ImageNet: $p=0.1$ saves $0.6629$ at final error $0.0780$;
+$p=0.2$ saves $0.6115$ at $0.0737$; $p=0.5$ saves only $0.3952$ but drives final
+error down to $0.0490$. Smaller $p$ = cheaper; larger $p$ = more corrections,
+lower released error.
+
+\cue{Point at the dashed vs.\ solid curves.} Dashed = counterfactual AI error
+\emph{before} correction (hovers near $\eps$, this is the $H_t$ the theory
+bounds); solid = realized error \emph{after} audit-and-correct (strictly below).
+The gap between them is literally the value of auditing. The released-label error
+stays controlled even under heavily partial feedback --- the online guarantee in
+action.
+
+\backup{These runs set $\eps_0=\eps$ rather than subtracting the
+finite-horizon slack $B_T$ of the tuning corollary. That is why a couple of tiny
+violations appear (e.g.\ ImageNetV2, $\eps=0.05$, $p=0.1$: violation $0.184$):
+without the slack the bound is exactly $\eps$, so finite-$T$ fluctuation can
+nudge over. Subtracting $B_T$ would remove them at a small cost in savings. The
+``AI error'' column is the pre-correction counterfactual; ``final error'' is
+post-correction.}
+
+% --------------------------------------------------------------------
+\section{Takeaways}
+\timecue{15:00}
+\cue{Close on the unifying idea.} One LP dual gives a single price of error.
+Offline we \emph{certify} it on held-out labels (Hoeffding + monotonicity);
+online we \emph{move} it with audited inverse-probability feedback (dual ascent +
+Azuma). In both regimes proxies affect efficiency, never validity.
+
+\cue{The evidence in three beats.} LP matches PAC with one source; routing
+clearly wins with two (0.78 vs.\ 0.47 budget saved); the online rule stays valid
+under partial feedback with $p$ as the cost/error dial.
+
+\cue{Honest limitation --- say it plainly.} Our real data has only one genuine
+cheap source, so the two-source win uses a synthetic split. The genuinely
+interesting regime is \emph{many sources with heterogeneous costs}: there the
+routed source $j_t^\lambda=\argmin_j\{c_t(j)+\lambda\hath_t(j)\}$ depends on
+$\lambda$, source-switching can make $L_T(\lambda)$ non-monotone, and the clean
+single-point certificate breaks --- you fall back to certifying a finite price
+grid (or enumerating breakpoints). Then thank the audience and invite questions.
+
+% ====================================================================
+\par\vspace{1.2\baselineskip}
+\hrule
+\vspace{0.4\baselineskip}
+{\Large\bfseries\color{blue!45!black}Anticipated Questions \& Prepared Answers}
+\vspace{0.3\baselineskip}
+
+\qsection{Q1. Why bother with the LP at all if one source just recovers original PAC?}
+Because the LP is what \emph{tells} you the right multi-source rule and where the
+guarantee comes from. With one source it must coincide with PAC --- that's the
+sanity check, not the contribution. The value shows up the moment you have more
+than one source (or non-trivial costs): the dual hands you ``route to
+$\argmin_a\{c_t(a)+\lambda\hath_t(a)\}$, then threshold'' automatically, and the
+two-source experiment shows that buys $\sim$0.31 extra budget saved over the best
+single source at the same error.
+
+\qsection{Q2. The two cheap sources are synthetic --- is the gain real?}
+Fair, and we flag it as the main limitation. The construction (specialty by
+class parity, random off-specialty labels) is engineered so routing \emph{can}
+help, so the number is an illustration of the mechanism, not a benchmark claim.
+But the mechanism is real: whenever sources have complementary strengths, picking
+the lower-proxy source per item before deferring strictly dominates committing to
+one source. The honest next step is heterogeneous-cost data with several genuine
+models.
+
+\qsection{Q3. The expert is assumed perfect. What if experts are noisy?}
+We treat the expert label as ground truth ($h_t(E)=0$) --- that's the standard
+PAC-labeling abstraction. With noisy experts the ``error'' being certified is
+error \emph{relative to the expert oracle}, and you'd need to model expert
+disagreement (e.g.\ multiple experts, majority vote, or a known expert error
+rate) to recover an absolute guarantee. Nothing in the LP forbids $h_t(E)>0$;
+the clean fallback ``defer everything $\Rightarrow$ zero error'' is what would
+need revisiting.
+
+\qsection{Q4. Hoeffding is loose. Can you tighten the offline bound?}
+Yes --- any valid one-sided upper confidence bound slots into the same monotone
+argument. We note an empirical-Bernstein bound that uses the sample variance
+$\widehat V_m(\lambda)$, which is much tighter when the calibration losses are
+low-variance (which they are here, since most routed items are correct).
+Betting-based confidence sequences also work if you reuse the calibration stream
+while expanding the price set. We kept Hoeffding in the main results for
+simplicity and comparability with PAC.
+
+\qsection{Q5. Why no union bound over $\lambda$ --- isn't that cheating?}
+No, it's the equal-cost structure. As $\lambda$ grows the threshold $1/\lambda$
+only falls, so an item can only switch AI$\to$expert, never between cheap
+sources. So $L_T(\lambda)$ is monotone and the candidate policies form one nested
+chain; the bad-selection event collapses onto a single fixed crossing price, so
+one pointwise Hoeffding bound suffices. The moment costs are unequal, source
+selection depends on $\lambda$, monotonicity breaks, and you \emph{do} pay a
+union bound over a price grid (or over the $\le1+(T+m)\binom{k+1}{2}$ breakpoints).
+
+\qsection{Q6. What exactly is $\eps_0$, and why does the online error sometimes exceed $\eps$?}
+$\eps_0\le\eps$ is an \emph{internal} target the price update aims at; the gap
+$\eps-\eps_0$ is reserved to absorb the finite-horizon slack $B_T$ (optimization +
+concentration terms). The theory says: set $\eps_0=\eps-B_T$ and you get final
+error $\le\eps$ with probability $1-\delta$. In the experiments we set
+$\eps_0=\eps$ for simplicity --- i.e.\ we spent the slack --- so the guarantee is
+exactly at the boundary and finite-$T$ noise produces a couple of tiny
+violations. Re-introducing the slack removes them.
+
+\qsection{Q7. How do you choose the audit rate $p$ (and the step size $\eta$)?}
+$p$ is a deliberate cost/validity dial: small $p$ saves budget but gives noisier
+feedback (larger $1/p_{\min}$ term); large $p$ corrects more labels and lowers
+realized error. The floor $p_{\min}$ enters the bound as $1/p_{\min}$, so you
+don't want it too small. For $\eta$, the bound is
+$\Lambda_{\mathrm{on}}/(\eta T)+O(1/\sqrt T)$, optimized at
+$\eta\asymp T^{-1/2}$, which makes the whole slack $O(T^{-1/2})$. In the runs we
+used a fixed $\eta=1$ and still saw control because $T$ is large.
+
+\qsection{Q8. Is this regret or error control? How does it relate to online conformal prediction?}
+It's \emph{realized-error} control over a fixed horizon, not regret against an
+offline expert-query oracle. The lineage is online/adaptive conformal prediction
+with partial (semi-bandit) feedback --- those methods update a calibration
+parameter online, and the key borrowed idea is that when labels aren't always
+revealed you must correct the update for the observation process. Our
+inverse-probability signal $O_t/q_t$ is exactly that correction. The object we
+control is the average error of the \emph{released dataset}, not prediction-set
+coverage.
+
+\qsection{Q9. What's the actual cost of calibration / auditing --- isn't that hidden expert spend?}
+Good --- we separate three costs in the report. \emph{Deployment} cost is
+$C_T(\lambda)$, the quantity we minimize. \emph{Development} cost is the expert
+labels used to train the proxy and to certify the price ($m=0.2T$ here); if those
+labeled items are part of the pool and corrected in the release, there's no
+duplicate expert charge for them. \emph{Audit} cost online is
+$\E[C_t\mid\calG_t]=D_t+(1-D_t)p_t$ per round --- the extra expert spend to obtain
+feedback. So the headline ``78\% saved'' is deployment savings; calibration is a
+one-time, accountable overhead.
+
+\qsection{Q10. Does the guarantee need i.i.d.\ data?}
+The offline pool guarantee is \emph{conditional on the fixed pool} --- it only
+needs the calibration indices to be sampled i.i.d.\ from the pool, not the data
+to be i.i.d.\ The \emph{generalization} corollary (population risk + fresh
+deployment pool) does assume an i.i.d.\ source distribution. The online guarantee
+is fully \emph{distribution-free in the data sequence} --- it can even be
+adversarial --- with all randomness coming from the audit coin flips. That
+robustness is one of the nicer features of the online side.
+
+\qsection{Q11. Why is ImageNetV2 harder (lower savings, occasional violation)?}
+ImageNetV2 is a known distribution shift from ImageNet --- the base model is less
+accurate and less calibrated on it, so at the same $\eps$ fewer items clear the
+confidence threshold and we defer more (savings drop from $\sim$0.78 to
+$\sim$0.55 at $\eps=0.10$). It's a useful stress test precisely because the proxy
+is worse there, and the guarantee still holds --- consistent with ``proxies
+affect cost, not validity.''
+
+\end{document}
