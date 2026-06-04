@@ -1,0 +1,118 @@
+% =====================================================================
+\section{Online}
+\begin{frame}[plain]
+  \centering
+  \vfill
+  {\Large\bfseries\color{accent} Part II --- Online PAC Labeling via Audits}\\[6pt]
+  \normalsize Items stream in; labels are hidden unless we audit.
+  \vfill
+\end{frame}
+
+% ----------------------------------------------------- ONLINE SETUP
+\begin{frame}{Online: a moving threshold + randomized audits}
+  Items arrive one at a time. AI losses are \emph{unobserved} unless we pay the expert.
+  \begin{itemize}
+    \item Keep a moving price $\lambda_t$; route then threshold:
+          $D_t=\ind{\hath_t^\lambda \ge 1/\lambda_t}$ (defer) .
+    \item If we use the AI label, \textbf{audit} it with probability
+          $p_t\in[p_{\min},1]$:
+          \[
+             A_t\sim\text{Bernoulli}(p_t).
+          \]
+          If audited, query the expert, \emph{correct} the label, and observe the AI's true error.
+  \end{itemize}
+  \begin{block}{Inverse-probability feedback}
+    \[
+       \widehat Z_t=\frac{O_t}{q_t}\,(H_t-\eps_0),
+       \qquad \E[\widehat Z_t\mid \mathcal{G}_t]=H_t-\eps_0 \;\;(\text{unbiased}).
+    \]
+    Audited rare errors are up-weighted by $1/p_t$ to stay unbiased.
+  \end{block}
+\end{frame}
+
+% ----------------------------------------------------- ONLINE UPDATE
+\begin{frame}{Online: the price update}
+  \[
+     \lambda_{t+1}=\bigl[\lambda_t+\eta\,\widehat Z_t\bigr]_+.
+  \]
+  \begin{itemize}
+    \item An audited \textbf{mistake} pushes $\lambda_t$ \emph{up} $\Rightarrow$
+          threshold $1/\lambda_t$ drops $\Rightarrow$ routing gets more conservative.
+    \item A \textbf{deferral} or a clean audit pushes $\lambda_t$ \emph{down}
+          $\Rightarrow$ trust the AI more.
+    \item Internal target $\eps_0\le\eps$ leaves slack for the finite-horizon bound.
+  \end{itemize}
+  \begin{block}{Theorem (audited online finite-horizon control)}
+    With probability $\ge 1-\delta$ over audit randomness, for \emph{any} data sequence,
+    \[
+       \frac1T\sum_{t=1}^{T} G_t \;\le\;
+       \eps_0+\frac{\Lambda_{\mathrm{on}}}{\eta T}
+       +\frac{1}{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}.
+    \]
+    Choosing $\eta\asymp T^{-1/2}$ gives final error $\le\eps$, slack $O(T^{-1/2})$.
+  \end{block}
+\end{frame}
+
+% -------------------------------------------------- ONLINE EXPERIMENT
+\begin{frame}{Online experiments: the validity--cost knob}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \centering
+      \includegraphics[width=\linewidth]{simple_online_pac_summary.png}
+      {\scriptsize Audited online sweep. Dashed = AI error before correction.}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \small
+      \textbf{Online} ($\eps=0.10$):
+      \begin{table}\centering\scriptsize
+      \begin{tabular}{lccc}
+        \toprule
+        Data & $p$ & Error & Saved \\
+        \midrule
+        IN   & 0.1 & 0.078 & 0.663 \\
+        IN   & 0.2 & 0.074 & 0.612 \\
+        IN   & 0.5 & 0.049 & 0.395 \\
+        INv2 & 0.2 & 0.078 & 0.468 \\
+        \bottomrule
+      \end{tabular}
+      \end{table}
+      \medskip
+      \begin{itemize}
+        \item Smaller $p$: save more budget.
+        \item Larger $p$: correct more, lower final error.
+        \item Released-label error tracked below target under partial feedback.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% --------------------------------------------------------- CONCLUSION
+\begin{frame}{Takeaways}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{One idea, two regimes}
+      \begin{itemize}
+        \item LP dual $\Rightarrow$ a single \emph{price of error} $\lambda$.
+        \item \textbf{Offline:} certify $\hat\lambda$ on held-out labels.
+        \item \textbf{Online:} move $\lambda_t$ with audited
+              inverse-probability feedback.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \textbf{What we showed}
+      \begin{itemize}
+        \item Proxies affect \emph{cost}, not \emph{validity}.
+        \item LP rule matches PAC with one source; \emph{routing wins} with two.
+        \item Online stays valid under partial feedback; $p$ trades cost vs.\ error.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vfill
+  \begin{block}{Limitation \& next step}
+    Current data has only one real cheap source. The interesting case is many
+    sources with \emph{heterogeneous costs}, where a scalar threshold no longer
+    suffices.
+  \end{block}
+  \vfill
+  \centering\textbf{\color{accent}Thank you! \quad Questions?}
+\end{frame}

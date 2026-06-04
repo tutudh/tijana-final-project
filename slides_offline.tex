@@ -1,0 +1,115 @@
+% =====================================================================
+\section{Offline}
+\begin{frame}[plain]
+  \centering
+  \vfill
+  {\Large\bfseries\color{accent} Part I --- Offline PAC Labeling}\\[6pt]
+  \normalsize Certify one price on a calibration set, then label the whole pool.
+  \vfill
+\end{frame}
+
+% ----------------------------------------------- OFFLINE CALIBRATION
+\begin{frame}{Offline: certify a price from a small labeled sample}
+  \textbf{Idea.} The cost $C_T(\lambda)$ is known from proxies; only the error
+  $L_T(\lambda)$ needs true labels. Estimate it on a calibration set.
+  \begin{itemize}
+    \item Sample $m$ items, get expert labels, form empirical loss
+          $\hatL_m(\lambda)$.
+    \item Hoeffding upper confidence bound:
+          \[
+             U_m(\lambda;\alpha)=\hatL_m(\lambda)+\sqrt{\tfrac{\log(1/\alpha)}{2m}}.
+          \]
+    \item Pick the \textbf{cheapest certified price}:
+          \[
+             \hat\lambda=\min\{\lambda\ge0:\;U_m(\lambda;\alpha)\le\eps\}.
+          \]
+  \end{itemize}
+  \begin{block}{Why no union bound over $\lambda$?}
+    As $\lambda$ grows, items only move \emph{AI $\to$ expert}. So
+    $L_T(\lambda)$ is \textbf{monotone} --- a single nested family, certified for free.
+  \end{block}
+\end{frame}
+
+% --------------------------------------------------- OFFLINE GUARANTEE
+\begin{frame}{Offline: the PAC guarantee}
+  \begin{block}{Theorem (offline monotone-threshold PAC)}
+    With probability at least $1-\alpha$ over the calibration draw, the released
+    labels satisfy
+    \[
+       \frac1T\sum_{t=1}^{T}\ell(Y_t,\tildeY_t)\;\le\;\eps.
+    \]
+  \end{block}
+  \begin{itemize}
+    \item Distribution-free, finite-sample. Falls back to expert-only if no
+          finite price qualifies.
+    \item \textbf{Corollary:} on a fresh deployment pool of size $n$, error
+          $\le \eps+\sqrt{\log(1/\delta)/2n}$ w.p.\ $1-\alpha-\delta$.
+    \item Proxies affect \emph{cost}, not \emph{validity}: a bad proxy just
+          defers more often.
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------ OFFLINE EXPERIMENT 1
+\begin{frame}{Offline experiments: LP rule matches original PAC}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \centering
+      \includegraphics[width=\linewidth]{simple_offline_pac_summary.png}
+      {\scriptsize One cheap source, ImageNet / ImageNetV2.}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \small
+      \textbf{One source} ($\eps=0.10$):
+      \begin{table}\centering\scriptsize
+      \begin{tabular}{llcc}
+        \toprule
+        Data & Method & Error & Saved \\
+        \midrule
+        IN   & LP    & 0.087 & 0.785 \\
+        IN   & PAC   & 0.088 & 0.786 \\
+        INv2 & LP    & 0.072 & 0.546 \\
+        INv2 & PAC   & 0.073 & 0.548 \\
+        \bottomrule
+      \end{tabular}
+      \end{table}
+      \medskip
+      \begin{itemize}
+        \item Error stays under target $\eps$ (0 violations).
+        \item LP fixed-price $\approx$ original PAC, as predicted.
+        \item Saves $\sim$78\% of expert budget on ImageNet.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------ OFFLINE EXPERIMENT 2
+\begin{frame}{Offline experiments: routing beats single sources}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \centering
+      \includegraphics[width=\linewidth]{two_source_offline_pac_summary.png}
+      {\scriptsize Two complementary cheap sources (by class parity).}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \small
+      \textbf{Two sources} ($\eps=0.10$, ImageNet):
+      \begin{table}\centering\scriptsize
+      \begin{tabular}{lcc}
+        \toprule
+        Method & Error & Saved \\
+        \midrule
+        LP routing        & 0.087 & \textbf{0.785} \\
+        Best-of-singles   & 0.088 & 0.475 \\
+        \bottomrule
+      \end{tabular}
+      \end{table}
+      \medskip
+      \begin{itemize}
+        \item Per-item routing to the lower-proxy source.
+        \item Same error control, but \textbf{much} larger budget savings
+              (0.78 vs 0.47).
+        \item This is where the LP view earns its keep.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
