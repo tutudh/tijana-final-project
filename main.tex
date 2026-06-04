@@ -227,7 +227,7 @@ unknown loss \(h_t(a)\) in \eqref{eq:true-price-action} with the fixed proxy los
 In the equal-cost setting \(c_t(j)=0\) and \(c_t(E)=1\), the chosen cheap
 source is independent of \(\lambda\): first set
 \begin{equation}
-    j_t^\lambda=j_t^\star
+    j_t^\star
     \in \argmin_{j\in[k]}\hath_{t}(j),
     \qquad
     s_t=\hath_t(j_t^\star)=\min_{j\in[k]}\hath_t(j).
@@ -392,15 +392,9 @@ threshold and use randomized audits for intermittent feedback.
 \subsection{Online PAC Labeling Setup and Audited Feedback}
 \label{sec:online-free-ai}
 
-Following the action-cost notation in \eqref{eq:itemwise-loss-cost}, we focus
-on the same regime where
-\(
-    c_t(j)=0 \;\forall t,j \in[k],
-    \,
-    c_t(E)=1.
-\)
-The goal is to label as many items as possible with AI while controlling the
-average error of the released dataset.
+We keep the same equal-cost regime as before (\(c_t(j)=0\) for \(j\in[k]\),
+\(c_t(E)=1\); see \eqref{eq:itemwise-loss-cost}), and aim to label as many items
+as possible with AI while controlling the average error of the released dataset.
 
 At time $t$, the learner observes the input $X_t$, cheap model labels
 $\{\hatY_t^{(j)}\}_{j=1}^k$, and predictable proxy losses
@@ -409,32 +403,20 @@ calibrated error estimates, or any predictable scores built from past
 expert/audit labels and current non-expert information.
 % \textcolor{orange}{Note: predictability excludes the current expert label,
 % audit draw, and loss before routing/audit decisions are made.}
-The algorithm first routes the item to the model with the smallest proxy loss:
-\begin{equation}
-    j_t^\lambda 
-    \in
-    \argmin_{j\in[k]}\hath_t(j),
-    \qquad
-    \hath_t^\lambda =\hath_t(j_t^\lambda ).
-    \label{eq:online-source}
-\end{equation}
-It then applies a scalar PAC-labeling threshold.  Let $\lambda_t\ge0$ denote
-the current price of error.  Equivalently, $1/\lambda_t$ is the current
-uncertainty threshold, with the convention that $1/\lambda_t=\infty$ when
+As in the offline case, the algorithm first routes the item to the cheap model
+with the smallest proxy loss, i.e.\ the routed source $j_t^\star$ and routed
+score $s_t$ of \eqref{eq:proxy-j-star}.
+It then applies the same threshold rule as offline (\eqref{eq:proxy-action}),
+but at the current price $\lambda_t\ge0$; equivalently $1/\lambda_t$ is the
+running uncertainty threshold, with the convention that $1/\lambda_t=\infty$ when
 $\lambda_t=0$.  The deferral decision is
-\begin{equation}
+\(
     D_t
     =
-    \ind{\lambda_t\hath_t^\lambda\ge1}
-    =
-    \ind{\hath_t^\lambda\ge 1/\lambda_t}.
-    \label{eq:online-defer}
-\end{equation}
-If $D_t=1$, the item is sent to the expert and the released label is
-$\tildeY_t=Y_t$.  
-Otherwise it initially releases the routed AI label. This is the PAC-labeling
-threshold form, with the multi-model extension contained in
-\(\hath_t^\lambda=\min_j\hath_t(j)\).
+    \ind{s_t\ge 1/\lambda_t}.\)
+% If $D_t=1$, the item is sent to the expert and the released label is
+% $\tildeY_t=Y_t$; otherwise it initially releases the routed AI label
+% $\hatY_t^{(j_t^\star)}$.
 
 When an AI label is used, its true loss is unobserved unless the expert label is
 also revealed. After every AI decision, the algorithm uses an audit probability
@@ -455,7 +437,7 @@ internal target $\eps_0\le\eps$:
     \begin{cases}
         -\eps_0,
         & \text{if the item is deferred to the expert},\\[2mm]
-        \{\ell(Y_t,\hatY_t^{(j_t^\lambda)})-\eps_0\}/p_t,
+        \{\ell(Y_t,\hatY_t^{(j_t^\star)})-\eps_0\}/p_t,
         & \text{if the AI label is used and audited},\\[2mm]
         0,
         & \text{if the AI label is used and not audited}.
@@ -477,98 +459,51 @@ future routing more conservative; deferrals or low-error audits decrease it.
 Let $G_t=\ell(Y_t,\tildeY_t)$ be the realized final loss after
 audit-and-correct. Since audited AI errors and expert deferrals use the true
 label,
-\[
+\(
     G_t\le H_t.
-\]
-Thus \(G_t\) is the final audit-and-correct loss, while \(H_t\) tracks the
-counterfactual AI loss used for feedback.
+\)
+% Thus \(G_t\) is the final audit-and-correct loss, while \(H_t\) tracks the
+% counterfactual AI loss used for feedback.
 
 \begin{algorithm}[ht]
 \caption{Audited online PAC labeling}
 \label{alg:online-audited}
+\small
 \begin{algorithmic}[1]
-\Require Stream horizon $T$; target error $\eps\in[0,1]$; audit floor
-$p_{\min}$; step size $\eta$; internal target
-$\eps_0\in[0,\eps]$.
+\Require Stream horizon $T$; target error $\eps\in[0,1]$; audit floor $p_{\min}$; step size $\eta$; internal target $\eps_0\in[0,\eps]$.
 \State Initialize $\lambda_1\ge0$.
 \For{$t=1,\ldots,T$}
-    \State Observe $X_t$, cheap labels $\{\hatY_t^{(j)}\}_{j=1}^k$, and
-    predictable proxies $\{\hath_t(j)\}_{j=1}^k$.
-    \State Choose $j_t^\lambda$ and $\hath_t^\lambda$ by \eqref{eq:online-source}.
-    \If{$\lambda_t\hath_t^\lambda\ge1$}
-        \State Query the expert, output $\tildeY_t=Y_t$, set $D_t=1$ and
-        $\widehat Z_t=-\eps_0$.
+    \State Observe $X_t$, cheap labels $\{\hatY_t^{(j)}\}_{j=1}^k$, and predictable proxies $\{\hath_t(j)\}_{j=1}^k$.
+    \State Determine the routed source $j_t^\star$ and routed score $s_t$ by \eqref{eq:proxy-j-star}.
+    \If{$\lambda_t s_t\ge1$}
+        \State Query the expert, output $\tildeY_t=Y_t$, set $D_t=1$ and $\widehat Z_t=-\eps_0$.
     \Else
-        \State Output the AI label $\tildeY_t=\hatY_t^{(j_t^\lambda)}$ and set
-        $D_t=0$.
-        \State Choose $p_t\in[p_{\min},1]$ before observing $Y_t$, then draw
-        $A_t\sim\mathrm{Bernoulli}(p_t)$.
-        \If{$A_t=1$}
-            \State Query the expert, correct $\tildeY_t=Y_t$, and
-            set
-            $\widehat Z_t=
-            \{\ell(Y_t,\hatY_t^{(j_t^\lambda)})-\eps_0\}/p_t$.
-        \Else
-            \State Set $\widehat Z_t=0$.
-        \EndIf
+        \State Output the AI label $\tildeY_t=\hatY_t^{(j_t^\star)}$, set $D_t=0$.
+        \State Choose $p_t\in[p_{\min},1]$ before observing $Y_t$, then draw $A_t\sim\mathrm{Bernoulli}(p_t)$.
+        \State \textbf{If} $A_t=1$: query the expert, correct $\tildeY_t=Y_t$, set $\widehat Z_t=\{\ell(Y_t,\hatY_t^{(j_t^\star)})-\eps_0\}/p_t$.
+        \State \textbf{Else}: set $\widehat Z_t=0$.
     \EndIf
     \State Update $\lambda_{t+1}$ by \eqref{eq:online-price-update}.
 \EndFor
 \end{algorithmic}
 \end{algorithm}
 
+
 \subsection{Online Finite-Horizon Guarantee}
 
-The online result is distribution-free with respect to the data sequence; the
+The online result is distribution-free w.r.t. the data sequence; the
 probability is over the algorithm's audit randomness.
 It controls realized error, not regret against an offline expert-query oracle.
 
-\begin{assumption}[Predictable routing and random audits]
+\begin{assumption}
 The routing decision, audit probability, and selected source are chosen using
 only past information and the current non-expert information
 $(X_t,\{\hatY_t^{(j)},\hath_t(j)\}_{j=1}^k)$.
 After this decision, the audit draw is independent Bernoulli with known
 probability $p_t\in[p_{\min},1]$.
+Also, for some $\rho>0$, $\hath_t(j)\in[\rho,1]$ for all $t,j$.
 \end{assumption}
 
-\begin{assumption}[Proxy floor]
-For some $\rho>0$, $\hath_t(j)\in[\rho,1]$ for all $t,j$.
-\end{assumption}
-
-For the finite-horizon analysis, define the augmented observation mask and its
-conditional observation probability by
-\begin{equation}
-    O_t=D_t+(1-D_t)A_t,
-    \qquad
-    q_t=D_t+(1-D_t)p_t .
-    \label{eq:online-augmented-mask}
-\end{equation}
-Thus $q_t=1$ on expert deferrals and $q_t=p_t$ on AI decisions.  The
-three-case update in Algorithm~\ref{alg:online-audited} can equivalently be
-written as the centered inverse-observation signal
-\begin{equation}
-    \widehat Z_t
-    =
-    \frac{O_t}{q_t}\,(H_t-\eps_0).
-    \label{eq:online-centered-signal}
-\end{equation}
-
-Let $\calG_t$ denote the pre-audit sigma-field that contains the history
-through round $t-1$, the current non-expert information, the selected source
-$j_t^\lambda$, the deferral decision $D_t$, the audit probability $p_t$, and the
-latent selected loss.  It does not contain the current audit draw $A_t$.
-The audit assumption says that, conditional on $\calG_t$, $A_t$ is an
-independent Bernoulli random variable with mean $p_t$ whenever $D_t=0$.
-
-\begin{proposition}[Unbiased intermittent update signal]
-\label{prop:online-unbiased}
-Under bounded loss and online predictability,
-\[
-    \E\left[\frac{O_t}{q_t}\,\middle|\,\calG_t\right]=1,
-    \qquad
-    \E[\widehat Z_t\mid\calG_t]=H_t-\eps_0.
-\]
-\end{proposition}
 
 \begin{theorem}[Audited online finite-horizon control]
 \label{thm:online-audited}
@@ -950,10 +885,46 @@ deployment events gives probability at least $1-\alpha-\delta$. \hfill$\square$
 \subsection{Online Proofs}
 \label{app:online-proofs}
 
+For the finite-horizon analysis, define the augmented observation mask and its
+conditional observation probability by
+\begin{equation}
+    O_t=D_t+(1-D_t)A_t,
+    \qquad
+    q_t=D_t+(1-D_t)p_t .
+    \label{eq:online-augmented-mask}
+\end{equation}
+Thus $q_t=1$ on expert deferrals and $q_t=p_t$ on AI decisions.  The
+three-case update in Algorithm~\ref{alg:online-audited} can equivalently be
+written as the centered inverse-observation signal
+\begin{equation}
+    \widehat Z_t
+    =
+    \frac{O_t}{q_t}\,(H_t-\eps_0).
+    \label{eq:online-centered-signal}
+\end{equation}
+
+Let $\calG_t$ denote the pre-audit sigma-field that contains the history
+through round $t-1$, the current non-expert information, the selected source
+$j_t^\star$, the deferral decision $D_t$, the audit probability $p_t$, and the
+latent selected loss.  It does not contain the current audit draw $A_t$.
+The audit assumption says that, conditional on $\calG_t$, $A_t$ is an
+independent Bernoulli random variable with mean $p_t$ whenever $D_t=0$.
+
+
+\begin{proposition}[Unbiased intermittent update signal]
+\label{prop:online-unbiased}
+Under bounded loss and online predictability,
+\[
+    \E\left[\frac{O_t}{q_t}\,\middle|\,\calG_t\right]=1,
+    \qquad
+    \E[\widehat Z_t\mid\calG_t]=H_t-\eps_0.
+\]
+\end{proposition}
+
 \paragraph{Proof of Proposition~\ref{prop:online-unbiased}.}
 Recall that $\calG_t$ fixes the predictable round-$t$ information, the selected
-source $j_t^\lambda$, the routed proxy loss
-$\hath_t^\lambda=\hath_t(j_t^\lambda)$, the audit probability $p_t$, the deferral
+source $j_t^\star$, the routed proxy loss
+$s_t=\hath_t(j_t^\star)$, the audit probability $p_t$, the deferral
 decision $D_t$, and the latent selected loss, but not the audit draw $A_t$.
 If $D_t=1$, then $O_t=q_t=1$ and $H_t=0$, so
 \[
@@ -963,7 +934,7 @@ If $D_t=1$, then $O_t=q_t=1$ and $H_t=0$, so
 \]
 If $D_t=0$, then $O_t=A_t$, $q_t=p_t$, and conditional on $\calG_t$ the audit
 draw is Bernoulli$(p_t)$ while the loss
-$\ell(Y_t,\hatY_t^{(j_t^\lambda)})$ is fixed.  Hence
+$\ell(Y_t,\hatY_t^{(j_t^\star)})$ is fixed.  Hence
 \[
     \E\left[
         \frac{O_t}{q_t}
@@ -992,9 +963,9 @@ Since $H_t$ and $\eps_0$ are fixed conditional on $\calG_t$, this also gives
 First bound the price process.
 If $\lambda_t\ge\lambda_{\mathrm{def}}=1/\rho$, then
 \[
-    \lambda_t\hath_t^\lambda
+    \lambda_t s_t
     =
-    \lambda_t\hath_t(j_t^\lambda )
+    \lambda_t\hath_t(j_t^\star)
     \ge
     \lambda_{\mathrm{def}}\rho
     =
@@ -1308,38 +1279,38 @@ audit correction.}
 \label{fig:simple-online-summary}
 \end{figure}
 
-\section{Alternative Confidence Bounds}
+% \section{Alternative Confidence Bounds}
 
-The Hoeffding bound \eqref{eq:hoeffding-ucb} is simple but may be conservative.
-Any valid one-sided mean upper confidence bound can be substituted.
-For example, for a fixed $\lambda$, an empirical Bernstein bound gives
-\begin{equation}
-    U_m^{\mathrm{EB}}(\lambda;\alpha)
-    =
-    \hatL_m(\lambda)
-    +
-    \sqrt{\frac{2\hat V_m(\lambda)\log(2/\alpha)}{m}}
-    +
-    \frac{7\log(2/\alpha)}{3(m-1)},
-\end{equation}
-where $\hat V_m(\lambda)$ is the sample variance of $H_{I_s}(\lambda)$.
+% The Hoeffding bound \eqref{eq:hoeffding-ucb} is simple but may be conservative.
+% Any valid one-sided mean upper confidence bound can be substituted.
+% For example, for a fixed $\lambda$, an empirical Bernstein bound gives
+% \begin{equation}
+%     U_m^{\mathrm{EB}}(\lambda;\alpha)
+%     =
+%     \hatL_m(\lambda)
+%     +
+%     \sqrt{\frac{2\hat V_m(\lambda)\log(2/\alpha)}{m}}
+%     +
+%     \frac{7\log(2/\alpha)}{3(m-1)},
+% \end{equation}
+% where $\hat V_m(\lambda)$ is the sample variance of $H_{I_s}(\lambda)$.
 
-When the monotone no-grid argument does not apply, the candidate
-prices can instead be certified simultaneously by a union bound. Over a finite
-grid $\Lambda$, the uniform Hoeffding bound
-\begin{equation}
-    U_m^{\mathrm{unif}}(\lambda;\alpha)
-    =
-    \hatL_m(\lambda)
-    +
-    \sqrt{\frac{\log(|\Lambda|/\alpha)}{2m}}
-    \label{eq:hoeffding-ucb-uniform}
-\end{equation}
-satisfies
-$\Pp\{\exists\,\lambda\in\Lambda: L_T(\lambda)>U_m^{\mathrm{unif}}(\lambda;\alpha)\}\le\alpha$.
+% When the monotone no-grid argument does not apply, the candidate
+% prices can instead be certified simultaneously by a union bound. Over a finite
+% grid $\Lambda$, the uniform Hoeffding bound
+% \begin{equation}
+%     U_m^{\mathrm{unif}}(\lambda;\alpha)
+%     =
+%     \hatL_m(\lambda)
+%     +
+%     \sqrt{\frac{\log(|\Lambda|/\alpha)}{2m}}
+%     \label{eq:hoeffding-ucb-uniform}
+% \end{equation}
+% satisfies
+% $\Pp\{\exists\,\lambda\in\Lambda: L_T(\lambda)>U_m^{\mathrm{unif}}(\lambda;\alpha)\}\le\alpha$.
 
-Betting-based confidence sequences can also be used if the calibration stream
-is reused while expanding the candidate price set.
+% Betting-based confidence sequences can also be used if the calibration stream
+% is reused while expanding the candidate price set.
 
 % \section{Not Very Meaningful Results}
 % \label{app:not-very-meaningful}
