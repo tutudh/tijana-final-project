@@ -12,6 +12,8 @@ __pycache__/
 *.toc
 *.bbl
 *.blg
+*.nav
+*.snm
 
 # Local/editor metadata
 .claude/
