@@ -122,6 +122,23 @@ $L_T(\lambda)$ monotone and what the data supports. Unequal costs come back in
 the limitation slide and in the Q\&A.}
 
 % --------------------------------------------------------------------
+\section{Setup schematic}
+\timecue{3:20}
+\cue{Use the picture to make the notation concrete.} For one data point $X_t$,
+there are $k+1$ possible actions: send it to the expert, or accept one of the
+$k$ model predictions. The table is just the definition in visual form. The
+expert row has loss $0$ and cost $1$. Each model row has cost $0$ and loss
+$\ell(Y_t,\hatY_t^{(j)})$, which is unknown until we see the true label.
+
+\cue{Connect back to the LP.} The whole LP is made by repeating this little
+choice table for every item $t=1,\dots,T$, then imposing one global average-error
+constraint across all those itemwise choices.
+
+\backup{This slide is also a good place to remind the audience that the expert
+is not another noisy model: in the setup it reveals the true label $Y_t$. The
+models are cheap alternatives whose loss is measured against $Y_t$.}
+
+% --------------------------------------------------------------------
 \section{The cost-aware LP}
 \timecue{4:00}
 \cue{Read the LP in words, not symbols.} Decision variable

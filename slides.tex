@@ -16,6 +16,8 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
 
 % ---- math shortcuts (mirrors the report) ----------------------------
 \newcommand{\R}{\mathbb{R}}
@@ -109,6 +111,48 @@
   \vfill
   \centering
   \footnotesize\textcolor{accent}{Key quantities: \emph{cost} we want to minimize, \emph{error} we must control.}
+\end{frame}
+
+% --------------------------------------------------------- SETUP DIAGRAM
+\begin{frame}{Setup schematic: one item, many actions}
+  \centering
+  \resizebox{0.95\textwidth}{!}{%
+  \begin{tikzpicture}[
+      item/.style={draw=accent!80, fill=accent!8, rounded corners=3pt,
+        align=center, minimum width=2.2cm, minimum height=1.05cm},
+      action/.style={draw=black!55, rounded corners=2pt, align=center,
+        minimum width=1.35cm, minimum height=0.55cm},
+      arrow/.style={-{Stealth[length=2mm]}, line width=0.4pt, draw=black!70}
+  ]
+  \node[item] (x) at (0,0) {data point\\$X_t$};
+  \node[action] (expert) at (3.0,1.8) {$E$};
+  \node[action] (modelone) at (3.0,0.9) {$1$};
+  \node[action] (modeltwo) at (3.0,0) {$2$};
+  \node[action] (dots) at (3.0,-0.9) {$\vdots$};
+  \node[action] (modelk) at (3.0,-1.8) {$k$};
+  \draw[arrow] (x.east) -- (expert.west);
+  \draw[arrow] (x.east) -- (modelone.west);
+  \draw[arrow] (x.east) -- (modeltwo.west);
+  \draw[arrow] (x.east) -- (dots.west);
+  \draw[arrow] (x.east) -- (modelk.west);
+  \node[draw=black!55, rounded corners=3pt, inner sep=6pt, anchor=west] at (4.35,0) {%
+  \begin{tabular}{lll}
+  \toprule
+  Action & Loss & Cost \\
+  \midrule
+  Expert \(E\) & \(0\) & \(1\) \\
+  Model \(1\) & \(\ell(Y_t,\hatY_t^{(1)})\) & \(0\) \\
+  Model \(2\) & \(\ell(Y_t,\hatY_t^{(2)})\) & \(0\) \\
+  \(\vdots\) & \(\vdots\) & \(\vdots\) \\
+  Model \(k\) & \(\ell(Y_t,\hatY_t^{(k)})\) & \(0\) \\
+  \bottomrule
+  \end{tabular}
+  };
+  \end{tikzpicture}%
+  }
+  \vfill
+  \footnotesize
+  Expert labels are correct but costly; model labels are free but may be wrong.
 \end{frame}
 
 % ----------------------------------------------------------------- LP
