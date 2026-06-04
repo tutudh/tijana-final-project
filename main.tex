@@ -187,8 +187,8 @@ The dual problem is the one-dimensional concave maximization problem (See Append
 This is the source of the fixed-price rule: once a price $\lambda$ is fixed,
 the dual minimization separates across items, and the action for item $t$ is given by the following simple rule:
 \begin{equation}
-    a_t(\lambda)
-    \in
+    a_t^\lambda
+    =
     \argmin_{a\in\calA}
     \{c_t(a)+\lambda h_t(a)\}.
     \label{eq:true-price-action}
@@ -223,12 +223,20 @@ We first use a labeled calibration sample to select a certified price
 
 For price estimation, we form the plug-in policy family by replacing the
 unknown loss \(h_t(a)\) in \eqref{eq:true-price-action} with the fixed proxy loss
-\(\hath_t(a)\).
-In the equal-cost setting \(c_t(j)=0\) and \(c_t(E)=1\), the chosen cheap
+\(\hath_t(a)\), taking \(\hath_t(E)=0\) for the expert:
+\[
+    a_t^\lambda
+    =
+    \argmin_{a\in\calA}
+    \{c_t(a)+\lambda\hath_t(a)\}.
+\]
+In the equal-cost setting \(c_t(j)=0\) and \(c_t(E)=1\), this plug-in rule
+simplifies. The chosen cheap
 source is independent of \(\lambda\): first set
 \begin{equation}
     j_t^\star
-    \in \argmin_{j\in[k]}\hath_{t}(j),
+    =
+    \argmin_{j\in[k]}\hath_{t}(j),
     \qquad
     s_t=\hath_t(j_t^\star)=\min_{j\in[k]}\hath_t(j).
     \label{eq:proxy-j-star}
@@ -249,13 +257,6 @@ label or defer to the expert:
     \label{eq:proxy-action}
 \end{equation}
 with the conventions \(1/0=\infty\) and \(1/\infty=0\).
-Equivalently,
-\[
-    a_t^\lambda
-    \in
-    \argmin_{a\in\calA}
-    \{c_t(a)+\lambda\hath_t(a)\}.
-\]
 The realized labeling loss and the cost given a price $\lambda$ are then
 \begin{equation}
     H_t(\lambda)
@@ -324,7 +325,7 @@ After calibration, the price is fixed. The final labeling rule is the plug-in
 dual rule at \(\hat\lambda\):
 \[
     a_t^{\hat\lambda}
-    \in
+    =
     \argmin_{a\in\calA}
     \{c_t(a)+\hat\lambda\hath_t(a)\}.
 \]
@@ -740,7 +741,7 @@ duality.
 Condition on the fixed target pool, labels, and proxy losses from the theorem.
 For the plug-in argmin over \(\calA\), we take \(\hath_t(E)=0\), so the expert
 objective is \(c_t(E)+\lambda\hath_t(E)=1\).
-The routed source \(j_t^\star\in\argmin_j\hath_t(j)\), the routed score
+The routed source \(j_t^\star=\argmin_j\hath_t(j)\), the routed score
 \(s_t=\hath_t(j_t^\star)\), and the routed loss
 \[
     r_t=\ell(Y_t,\hatY_t^{(j_t^\star)})\in[0,1]
@@ -1200,7 +1201,7 @@ correction, and the reported final error is the realized loss after
 correction.
 As noted in Section~\ref{sec:experiments}, these runs target $\eps$ directly
 rather than subtracting the finite-horizon slack $B_T$ of
-Remark~\ref{rmk:online-pac-tuning}. The full sweep over
+Theorem~\ref{thm:online-audited}. The full sweep over
 $\eps\in\{0.05,0.10,0.15\}$ and $p\in\{0.1,0.2,0.5\}$ is reported in
 Table~\ref{tab:online-full-results} and
 Figure~\ref{fig:simple-online-summary}.
