@@ -79,21 +79,21 @@ Wanyu Zhang \quad Lutong Hao \quad Daohong Tu
 \end{center}
 \vspace{-0.6em}
 
-\noindent\textbf{Abstract.}
-We present PAC labeling from a finite-pool linear-programming perspective and
-use this view to motivate an online audited extension.  Offline, the LP dual
-induces a scalar price of error: proxy losses determine the routed cheap
-source and expert deferral, while held-out labels certify the selected policy.
-Online, the method maintains a moving
-threshold and uses randomized expert audits to obtain inverse-probability
-feedback for updating it.  Under predictable proxy scores and independent
-audits, this gives finite-horizon high-probability control of the realized
-error of the released labels.
+% \noindent\textbf{Abstract.}
+% We present PAC labeling from a linear-programming perspective and
+% use this view to motivate an online audited extension.  Offline, the LP dual
+% induces a scalar price of error: proxy losses determine the routed cheap
+% source and expert deferral, while held-out labels certify the selected policy.
+% Online, the method maintains a moving
+% threshold and uses randomized expert audits to obtain inverse-probability
+% feedback for updating it.  Under predictable proxy scores and independent
+% audits, this gives finite-horizon high-probability control of the realized
+% error of the released labels.
 
 \section{Problem Setup and LP Formulation}
 \label{sec:optimization-dual}
 
-\subsection{Setup and Notation}
+% \subsection{Setup and Notation}
 
 There is a fixed pool of unlabeled items $X_1,\ldots,X_T$,
 whose true labels $Y_1,\ldots,Y_T$ are initially unknown, and the goal is to labeling the items correctly while minimizing labeling cost.
@@ -195,11 +195,12 @@ the dual minimization separates across items, and the action for item $t$ is giv
 \end{equation}
 The dual price $\lambda$ balances the trade-off between cost and error.
 
-\subsection{Roadmap}
+\paragraph{Roadmap}
 The LP view reduces the expert--error trade-off to a single dual price
 \(\lambda\). Because the oracle rule depends on the unknown losses \(h_t(a)\),
 we use proxy losses \(\hath_t(a)\), learned on an independent split or fixed in
-advance, to construct price-indexed policies. These proxies need not be
+advance. 
+These proxies need not be
 conservative or calibrated: better proxies improve cost, while held-out
 calibration provides validity. We assume the itemwise losses in the argmin rules
 are distinct, so ties do not occur.
@@ -333,39 +334,37 @@ compute \(j_t^\star\) and \(s_t\) from \eqref{eq:proxy-j-star}. If
 Otherwise, accept the routed cheap label and release
 \(\tildeY_t=\hatY_t^{(j_t^\star)}\).
 
-\begin{algorithm}[htbp]
-\caption{Offline fixed-price labeling}
-\label{alg:offline-fixed-price}
-\begin{algorithmic}[1]
-\Require Unlabeled pool $X_1,\ldots,X_T$; cheap predictions $\{\hatY_t^{(j)}\}_{j\in[k]}$; proxy losses $\{\hath_{t}(j)\}_{j\in[k]}$; target error $\eps$; failure level $\alpha$.
-\Statex \textbf{Stage 1: Price estimation on a calibration set}
-\State Sample calibration indices $I_1,\ldots,I_m\stackrel{\mathrm{i.i.d.}}{\sim}\operatorname{Unif}([T])$ and collect expert labels $\{Y_{I_s}\}_{s=1}^m$.
-\State Form the empirical loss $\hatL_m(\lambda)$ \eqref{eq:empirical-cal-loss} and the level-$(1-\alpha)$ upper confidence bound $U_m(\lambda;\alpha)$ \eqref{eq:hoeffding-ucb}.
-\State Select the certified price
-       $\hat\lambda=\min\{\lambda\ge0 : U_m(\lambda;\alpha)\le\eps\}$ \eqref{eq:certified-price-selection}.
-\Statex \textbf{Stage 2: Label the pool at price $\hat\lambda$}
-\For{$t=1,\ldots,T$}
-    \State Pick the best cheap model $j_t\in\argmin_{j\in[k]}\hath_{t}(j)$.
-    \State \textbf{If} $\hath_{t}(j_t)\ge 1/\hat\lambda$: query expert, $\tildeY_t \gets Y_t$.
-    \State \textbf{Else}: accept cheap label, $\tildeY_t \gets \hatY_t^{(j_t)}$.
-\EndFor
-\Ensure Labels $\tildeY_1,\ldots,\tildeY_T$ with certified error $\le\eps$ at level $1-\alpha$.
-\end{algorithmic}
-\end{algorithm}
+% \begin{algorithm}[htbp]
+% \caption{Offline fixed-price labeling}
+% \label{alg:offline-fixed-price}
+% \begin{algorithmic}[1]
+% \Require Unlabeled pool $X_1,\ldots,X_T$; cheap predictions $\{\hatY_t^{(j)}\}_{j\in[k]}$; proxy losses $\{\hath_{t}(j)\}_{j\in[k]}$; target error $\eps$; failure level $\alpha$.
+% \Statex \textbf{Stage 1: Price estimation on a calibration set}
+% \State Sample calibration indices $I_1,\ldots,I_m\stackrel{\mathrm{i.i.d.}}{\sim}\operatorname{Unif}([T])$ and collect expert labels $\{Y_{I_s}\}_{s=1}^m$.
+% \State Form the empirical loss $\hatL_m(\lambda)$ \eqref{eq:empirical-cal-loss} and the level-$(1-\alpha)$ upper confidence bound $U_m(\lambda;\alpha)$ \eqref{eq:hoeffding-ucb}.
+% \State Select the certified price
+%        $\hat\lambda=\min\{\lambda\ge0 : U_m(\lambda;\alpha)\le\eps\}$ \eqref{eq:certified-price-selection}.
+% \Statex \textbf{Stage 2: Label the pool at price $\hat\lambda$}
+% \For{$t=1,\ldots,T$}
+%     \State Pick the best cheap model $j_t\in\argmin_{j\in[k]}\hath_{t}(j)$.
+%     \State \textbf{If} $\hath_{t}(j_t)\ge 1/\hat\lambda$: query expert, $\tildeY_t \gets Y_t$.
+%     \State \textbf{Else}: accept cheap label, $\tildeY_t \gets \hatY_t^{(j_t)}$.
+% \EndFor
+% \Ensure Labels $\tildeY_1,\ldots,\tildeY_T$ with certified error $\le\eps$ at level $1-\alpha$.
+% \end{algorithmic}
+% \end{algorithm}
 
 \paragraph{Relation to PAC labeling.}
 
 In the single-source case, using uncertainty score as the proxy
 \(\hath_t=U_t\), the AI label is used when
-\[
-    \hath_t = U_t < 1/\hat\lambda.
-\]
+$\hath_t = U_t < 1/\hat\lambda.$
 Thus the LP rule recovers the original PAC-labeling threshold family
 \cite{candes2025paclabels}; with multiple sources, \(U_t\) is replaced by
 \(\min_j\hath_t(j)\).
 
 
-\subsection{Offline PAC Guarantees}
+\subsection{Offline PAC Guarantee}
 
 
 \begin{theorem}[Offline monotone-threshold PAC guarantee]
@@ -379,35 +378,9 @@ indices, the released labels satisfy
     \label{eq:offline-pac-guarantee}
 \end{equation}
 \end{theorem}
-The proof is in Appendix~\ref{app:offline-proofs}. The same calibration idea also gives
-an inductive version.
+The proof is in Appendix~\ref{app:offline-proofs}.
 
-\begin{corollary}[Generalization guarantee]
-\label{cor:inductive-deployment}
-Suppose the calibration set is an i.i.d.\ sample from a distribution $P$. For a price
-$\lambda$, define the population risk
-\[
-    L(\lambda)
-    =
-    \E_{(X,Y)\sim P}
-    \left[
-        (1-D^\lambda(X))
-        \ell\bigl(Y,\hatY^{(j^\star(X))}(X)\bigr)
-    \right].
-\]
-Assume the equal-cost monotone-threshold policy class above, and let
-\(\hat\lambda\) be selected over \([0,\infty]\) by
-\eqref{eq:certified-price-selection}.
-Then $L(\hat\lambda)\le\eps$ with probability at least $1-\alpha$.
-Moreover, for an independent deployment pool of size \(n\), with probability at
-least \(1-\alpha-\delta\),
-\begin{equation}
-    \frac{1}{n}\sum_{t=1}^{n} \ell(Y_t,\tildeY_t)
-    \le
-    \eps + \sqrt{\frac{\log(1/\delta)}{2n}}.
-    \label{eq:inductive-realized-bound}
-\end{equation}
-\end{corollary}
+
 
 \section{Online PAC Labeling via Audits}
 \label{sec:online-audited}
@@ -474,12 +447,6 @@ If $A_t=1$, the expert label is queried, the final released label is
 corrected to $Y_t$, and the audit records the counterfactual error of the
 routed AI label.
 
-Define the counterfactual AI-decision loss
-\[
-    H_t
-    =
-    (1-D_t)\ell\bigl(Y_t,\hatY_t^{(j_t^\lambda)}\bigr).
-\]
 Deferral has zero loss because the expert label is used. The update uses an
 internal target $\eps_0\le\eps$:
 \[
@@ -639,23 +606,7 @@ where \(G_t\) is the final audit-and-correct loss, while \(H_t\) tracks the
 counterfactual AI loss used for feedback.
 \end{theorem}
 
-\begin{corollary}[PAC-style online tuning]
-\label{cor:online-pac-tuning}
-Under the conditions of Theorem~\ref{thm:online-audited}, let
-\(\bar\Lambda_{\mathrm{on}}=\max\{\lambda_1,1/\rho+\eta/p_{\min}\}\) and
-\[
-    B_T
-    =
-    \frac{\bar\Lambda_{\mathrm{on}}}{\eta T}
-    +
-    \frac1{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}.
-\]
-If \(B_T\le\eps\), choose the internal target
-\(\eps_0\in[0,\eps-B_T]\), typically \(\eps_0=\eps-B_T\). Then the
-audit-and-correct final labels satisfy
-\(\frac1T\sum_{t=1}^T G_t\le\eps\) with probability at least \(1-\delta\).
-With \(\eta\asymp T^{-1/2}\) and constant \(p_{\min}\), \(B_T=O(T^{-1/2})\).
-\end{corollary}
+
 
 The proofs of Proposition~\ref{prop:online-unbiased},
 Theorem~\ref{thm:online-audited}, and
@@ -712,15 +663,15 @@ Online & ImageNetV2 & Audited, \(p=0.2\) & 0.0783 & 0.0000 & 0.4681 \\
 Full sweeps and
 implementation details are deferred to Appendix~\ref{app:experiments}.
 
-\section{Discussion}
+% \section{Discussion}
 
-Offline calibration certifies a fixed policy on a held-out labeled sample,
-while online auditing controls a moving policy by converting hidden AI losses
-into an unbiased intermittent-feedback signal. In both regimes, proxies affect
-efficiency rather than validity. The main empirical limitation is that the
-current data contain only one cheap source. A stronger test would use several
-cheap sources with heterogeneous costs, where a scalar threshold alone no
-longer captures the routing problem.
+% Offline calibration certifies a fixed policy on a held-out labeled sample,
+% while online auditing controls a moving policy by converting hidden AI losses
+% into an unbiased intermittent-feedback signal. In both regimes, proxies affect
+% efficiency rather than validity. The main empirical limitation is that the
+% current data contain only one cheap source. A stronger test would use several
+% cheap sources with heterogeneous costs, where a scalar threshold alone no
+% longer captures the routing problem.
 
 
 \bibliographystyle{unsrt}
@@ -737,11 +688,11 @@ The closest starting point is PAC labeling
 cost-effective dataset labeling using AI predictions and expert audits.
 That framework already includes both scalar-threshold PAC labeling and
 multi-model PAC routing variants.
-Our formulation is best viewed as a complementary optimization-first
-presentation: we start from a finite-pool cost-minimization LP, derive the
-fixed-price routing rule from its dual, allow item- and source-specific costs,
-and then use calibration only to certify the actual loss of the selected
-proxy-generated policy.
+% Our formulation is best viewed as a complementary optimization-first
+% presentation: we start from a finite-pool cost-minimization LP, derive the
+% fixed-price routing rule from its dual, allow item- and source-specific costs,
+% and then use calibration only to certify the actual loss of the selected
+% proxy-generated policy.
 The calibration logic is closely related to conformal prediction and
 distribution-free uncertainty quantification
 \cite{vovk2005,angelopoulos2021gentle}, but the object being controlled here is
@@ -754,9 +705,7 @@ to handle changing environments \cite{gibbs2021adaptive}.
 Recent work has studied intermittent or semi-bandit feedback, where labels are
 not always observed \cite{ge2024stochastic,wang2025mirror,yang2026adversarial}.
 Those papers motivate the audited online extension in
-Section~\ref{sec:online-audited}: when labels are not always revealed, the
-feedback used to update a calibration or price parameter must be corrected for
-the observation process.
+Section~\ref{sec:online-audited}.
 
 \paragraph{Learning to defer and cost-sensitive routing.}
 Learning-to-defer methods train systems that either predict or pass an item to
@@ -852,7 +801,7 @@ loss, and it is bounded because costs are nonnegative and finite.
 Therefore strong duality holds by finite-dimensional linear programming
 duality.
 
-\subsection{Offline Proofs}
+\subsection{Offline Proofs and Extended Results}
 \label{app:offline-proofs}
 \paragraph{Proof of Theorem~\ref{thm:offline-fixed-price-pac}.}
 Condition on the fixed target pool, labels, and proxy losses from the theorem.
@@ -918,6 +867,35 @@ Finally, the released label equals \(\hatY_t^{(j_t^\star)}\) on routed items
 and \(Y_t\) on deferred items, so
 \(\frac1T\sum_t\ell(Y_t,\tildeY_t)=L_T(\hat\lambda)\). If calibration items are
 corrected to their expert labels, the realized loss only decreases. \hfill$\square$
+
+The following corollary gives a population risk control under a same-distribution assumption.
+
+\begin{corollary}[Generalization guarantee]
+\label{cor:inductive-deployment}
+Suppose the calibration set is an i.i.d.\ sample from a distribution $P$. For a price
+$\lambda$, define the population risk
+\[
+    L(\lambda)
+    =
+    \E_{(X,Y)\sim P}
+    \left[
+        (1-D^\lambda(X))
+        \ell\bigl(Y,\hatY^{(j^\star(X))}(X)\bigr)
+    \right].
+\]
+Assume the equal-cost monotone-threshold policy class above, and let
+\(\hat\lambda\) be selected over \([0,\infty]\) by
+\eqref{eq:certified-price-selection}.
+Then $L(\hat\lambda)\le\eps$ with probability at least $1-\alpha$.
+Moreover, for an independent deployment pool of size \(n\), with probability at
+least \(1-\alpha-\delta\),
+\begin{equation}
+    \frac{1}{n}\sum_{t=1}^{n} \ell(Y_t,\tildeY_t)
+    \le
+    \eps + \sqrt{\frac{\log(1/\delta)}{2n}}.
+    \label{eq:inductive-realized-bound}
+\end{equation}
+\end{corollary}
 
 \paragraph{Proof of Corollary~\ref{cor:inductive-deployment}.}
 Under equal cheap-source costs the routed source \(j^\star(X)\) does not depend
@@ -1082,6 +1060,24 @@ Because
 combining the last displays gives \eqref{eq:online-H-bound}.
 The same display includes the final-loss bound because audit-and-correct gives
 $G_t\le H_t$ pointwise. \hfill$\square$
+
+\begin{corollary}[PAC-style online tuning]
+\label{cor:online-pac-tuning}
+Under the conditions of Theorem~\ref{thm:online-audited}, let
+\(\bar\Lambda_{\mathrm{on}}=\max\{\lambda_1,1/\rho+\eta/p_{\min}\}\) and
+\[
+    B_T
+    =
+    \frac{\bar\Lambda_{\mathrm{on}}}{\eta T}
+    +
+    \frac1{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}.
+\]
+If \(B_T\le\eps\), choose the internal target
+\(\eps_0\in[0,\eps-B_T]\), typically \(\eps_0=\eps-B_T\). Then the
+audit-and-correct final labels satisfy
+\(\frac1T\sum_{t=1}^T G_t\le\eps\) with probability at least \(1-\delta\).
+With \(\eta\asymp T^{-1/2}\) and constant \(p_{\min}\), \(B_T=O(T^{-1/2})\).
+\end{corollary}
 
 \paragraph{Proof of Corollary~\ref{cor:online-pac-tuning}.}
 Since \(\eps_0\ge0\), we have
@@ -1342,166 +1338,148 @@ grid $\Lambda$, the uniform Hoeffding bound
 satisfies
 $\Pp\{\exists\,\lambda\in\Lambda: L_T(\lambda)>U_m^{\mathrm{unif}}(\lambda;\alpha)\}\le\alpha$.
 
-\begin{remark}[Unequal cheap-source costs]
-\label{rmk:unequal-costs}
-Under equal cheap-source costs the selected source
-$j_t^\lambda\in\argmin_j\hath_{t}(j)$ does not depend on $\lambda$, the routed
-loss is monotone in the scalar score $\min_j\hath_{t}(j)$, and
-Theorem~\ref{thm:offline-fixed-price-pac} certifies the price selected over the
-continuum $[0,\infty]$ with the monotone bound \eqref{eq:hoeffding-ucb} at level
-$\alpha$. Under
-unequal costs the selected source
-$j_t^\lambda\in\argmin_j\{c_t(j)+\lambda\hath_{t}(j)\}$ varies with $\lambda$, so
-source switching can make $L_T(\lambda)$ non-monotone and the single-point
-argument no longer applies. One then certifies a finite price grid $\Lambda$
-with the uniform bound \eqref{eq:hoeffding-ucb-uniform}---equivalently, replaces
-$\alpha$ by $\alpha/|\Lambda|$ in \eqref{eq:hoeffding-ucb}---and
-Corollary~\ref{cor:all-prices} bounds the grid size needed to cover the
-continuum.
-\end{remark}
-
 Betting-based confidence sequences can also be used if the calibration stream
 is reused while expanding the candidate price set.
 
-\section{Not Very Meaningful Results}
-\label{app:not-very-meaningful}
+% \section{Not Very Meaningful Results}
+% \label{app:not-very-meaningful}
 
-The following observation is included only to show that a continuum of prices
-can be reduced to a finite policy class on a fixed finite dataset.
-It is relevant only under unequal cheap-source costs, where source selection
-varies with $\lambda$; under the equal-cost setting of the main text
-Theorem~\ref{thm:offline-fixed-price-pac} already certifies the
-continuum-selected price without it. It is not a main contribution: the resulting confidence penalty may be
-larger than that of a deliberately chosen price grid, and it does not remove
-the uniform-certification cost.
+% The following observation is included only to show that a continuum of prices
+% can be reduced to a finite policy class on a fixed finite dataset.
+% It is relevant only under unequal cheap-source costs, where source selection
+% varies with $\lambda$; under the equal-cost setting of the main text
+% Theorem~\ref{thm:offline-fixed-price-pac} already certifies the
+% continuum-selected price without it. It is not a main contribution: the resulting confidence penalty may be
+% larger than that of a deliberately chosen price grid, and it does not remove
+% the uniform-certification cost.
 
-\subsection{Continuous Prices and Breakpoint Enumeration}
-\label{sec:breakpoints}
+% \subsection{Continuous Prices and Breakpoint Enumeration}
+% \label{sec:breakpoints}
 
-For each item $t$, set $\hath_t(E)=0$ and $\hath_t(j)=\hath_{t}(j)$.
-The action selected by a fixed price is the lower envelope of the $k+1$ lines
-\[
-    c_t(a)+\lambda\hath_t(a),
-    \qquad a\in\{E,1,\ldots,k\}.
-\]
-The action can change only when two of these lines cross.
+% For each item $t$, set $\hath_t(E)=0$ and $\hath_t(j)=\hath_{t}(j)$.
+% The action selected by a fixed price is the lower envelope of the $k+1$ lines
+% \[
+%     c_t(a)+\lambda\hath_t(a),
+%     \qquad a\in\{E,1,\ldots,k\}.
+% \]
+% The action can change only when two of these lines cross.
 
-\begin{corollary}[Uniform certification over all prices]
-\label{cor:all-prices}
-Fix a bounded interval $[0,\lambda_{\max}]$ and include the expert-only policy
-as an additional candidate.
-Let $\Pi_{\lambda}$ be the fixed-price policy induced by the unique minimizer
-\[
-    a_t^\lambda\in\argmin_{a\in\{E,1,\ldots,k\}}
-    \{c_t(a)+\lambda\hath_t(a)\}
-\]
-on the union of the target and calibration items.
-The number of distinct induced policies over
-$\lambda\in[0,\lambda_{\max}]$ at which these minimizers are unique is at most
-\begin{equation}
-    N_{\mathrm{br}}
-    \le
-    1+(T+m)\binom{k+1}{2}.
-    \label{eq:breakpoint-count}
-\end{equation}
-Therefore the finite-policy uniform guarantee holds over all
-\(\lambda\) with unique minimizers after replacing $|\Lambda|$ in
-\eqref{eq:hoeffding-ucb-uniform} by $N_{\mathrm{br}}$. Under equal cheap-source
-costs this enumeration is unnecessary: source selection does not depend on
-$\lambda$, $L_T$ is monotone, and Theorem~\ref{thm:offline-fixed-price-pac}
-already certifies the continuum-selected price with the monotone bound
-\eqref{eq:hoeffding-ucb}.
-\end{corollary}
+% \begin{corollary}[Uniform certification over all prices]
+% \label{cor:all-prices}
+% Fix a bounded interval $[0,\lambda_{\max}]$ and include the expert-only policy
+% as an additional candidate.
+% Let $\Pi_{\lambda}$ be the fixed-price policy induced by the unique minimizer
+% \[
+%     a_t^\lambda\in\argmin_{a\in\{E,1,\ldots,k\}}
+%     \{c_t(a)+\lambda\hath_t(a)\}
+% \]
+% on the union of the target and calibration items.
+% The number of distinct induced policies over
+% $\lambda\in[0,\lambda_{\max}]$ at which these minimizers are unique is at most
+% \begin{equation}
+%     N_{\mathrm{br}}
+%     \le
+%     1+(T+m)\binom{k+1}{2}.
+%     \label{eq:breakpoint-count}
+% \end{equation}
+% Therefore the finite-policy uniform guarantee holds over all
+% \(\lambda\) with unique minimizers after replacing $|\Lambda|$ in
+% \eqref{eq:hoeffding-ucb-uniform} by $N_{\mathrm{br}}$. Under equal cheap-source
+% costs this enumeration is unnecessary: source selection does not depend on
+% $\lambda$, $L_T$ is monotone, and Theorem~\ref{thm:offline-fixed-price-pac}
+% already certifies the continuum-selected price with the monotone bound
+% \eqref{eq:hoeffding-ucb}.
+% \end{corollary}
 
-\begin{proof}
-For a fixed item, the selected action is constant between consecutive crossing
-points of pairs of lines
-$c_t(a)+\lambda\hath_t(a)$.
-There are at most $\binom{k+1}{2}$ pairwise crossings per item.
-Across $T+m$ target and calibration items, there are therefore at most
-\[
-    B=(T+m)\binom{k+1}{2}
-\]
-crossing values, counting multiplicity.
-These crossing values partition $[0,\lambda_{\max}]$ into at most $B+1$ open
-intervals. Within each open interval the entire vector of decisions on target
-and calibration items is fixed.
-Thus the number of distinct induced policies with unique minimizers is at most
-\(B+1\).
-Choose one representative price from each distinct induced policy and apply the
-finite-policy Hoeffding union bound \eqref{eq:hoeffding-ucb-uniform} to those
-representatives. Every \(\lambda\) with unique minimizers induces one of these
-representative policies, so the same uniform guarantee holds over all such
-prices.
-\end{proof}
+% \begin{proof}
+% For a fixed item, the selected action is constant between consecutive crossing
+% points of pairs of lines
+% $c_t(a)+\lambda\hath_t(a)$.
+% There are at most $\binom{k+1}{2}$ pairwise crossings per item.
+% Across $T+m$ target and calibration items, there are therefore at most
+% \[
+%     B=(T+m)\binom{k+1}{2}
+% \]
+% crossing values, counting multiplicity.
+% These crossing values partition $[0,\lambda_{\max}]$ into at most $B+1$ open
+% intervals. Within each open interval the entire vector of decisions on target
+% and calibration items is fixed.
+% Thus the number of distinct induced policies with unique minimizers is at most
+% \(B+1\).
+% Choose one representative price from each distinct induced policy and apply the
+% finite-policy Hoeffding union bound \eqref{eq:hoeffding-ucb-uniform} to those
+% representatives. Every \(\lambda\) with unique minimizers induces one of these
+% representative policies, so the same uniform guarantee holds over all such
+% prices.
+% \end{proof}
 
-\subsection{Explicit Cost Accounting}
+% \subsection{Explicit Cost Accounting}
 
-This accounting is useful for implementation, but it is not central to the
-statistical guarantee.
-The main distinction is between deployment cost, development-label cost, and
-audit or correction cost.
+% This accounting is useful for implementation, but it is not central to the
+% statistical guarantee.
+% The main distinction is between deployment cost, development-label cost, and
+% audit or correction cost.
 
-\paragraph{Deployment labeling cost.}
-For a fixed offline price $\lambda$, the average deployment cost on the target
-pool is exactly $C_T(\lambda)$ from \eqref{eq:L-C-lambda}, that is,
-$\frac1T\sum_{t=1}^T[D_t^\lambda c_{t,E}+(1-D_t^\lambda)c_{t,j_t^\lambda}]$.
-This is the cost optimized in \eqref{eq:certified-price-selection}.
-If cheap predictions have already been precomputed at no marginal deployment
-cost, set $c_{t,j}=0$.
-If calling a model has a per-token, per-image, or per-query cost, include that
-cost in $c_{t,j}$.
+% \paragraph{Deployment labeling cost.}
+% For a fixed offline price $\lambda$, the average deployment cost on the target
+% pool is exactly $C_T(\lambda)$ from \eqref{eq:L-C-lambda}, that is,
+% $\frac1T\sum_{t=1}^T[D_t^\lambda c_{t,E}+(1-D_t^\lambda)c_{t,j_t^\lambda}]$.
+% This is the cost optimized in \eqref{eq:certified-price-selection}.
+% If cheap predictions have already been precomputed at no marginal deployment
+% cost, set $c_{t,j}=0$.
+% If calling a model has a per-token, per-image, or per-query cost, include that
+% cost in $c_{t,j}$.
 
-\paragraph{Offline development cost.}
-If $m_{\mathrm{train}}$ expert labels are used to train $\hath$ and
-$m_{\mathrm{cal}}$ expert labels are used to certify the fixed price, the
-development cost is
-\begin{equation}
-    C^{\mathrm{dev}}
-    =
-    \sum_{i\in I_{\mathrm{train}}} c_{i,E}
-    +
-    \sum_{i\in I_{\mathrm{cal}}} c_{i,E}
-    +
-    \textnormal{cheap-source costs incurred on development items}.
-    \label{eq:development-cost}
-\end{equation}
-This cost may be treated as sunk if the labeled development data already exist,
-but it should be included when comparing end-to-end data-curation pipelines.
+% \paragraph{Offline development cost.}
+% If $m_{\mathrm{train}}$ expert labels are used to train $\hath$ and
+% $m_{\mathrm{cal}}$ expert labels are used to certify the fixed price, the
+% development cost is
+% \begin{equation}
+%     C^{\mathrm{dev}}
+%     =
+%     \sum_{i\in I_{\mathrm{train}}} c_{i,E}
+%     +
+%     \sum_{i\in I_{\mathrm{cal}}} c_{i,E}
+%     +
+%     \textnormal{cheap-source costs incurred on development items}.
+%     \label{eq:development-cost}
+% \end{equation}
+% This cost may be treated as sunk if the labeled development data already exist,
+% but it should be included when comparing end-to-end data-curation pipelines.
 
-\paragraph{Audit-or-correction cost.}
-In the offline setting, calibration labels play the role that audits play
-online.
-If calibration items are part of the target pool and are corrected to expert
-labels in the released dataset, then there is no duplicate expert cost for
-those items.
-The total realized end-to-end cost can be written as
-\begin{equation}
-    C_T^{\mathrm{total}}(\lambda)
-    =
-    \frac1T\sum_{t=1}^T
-    \left[
-        (1-D_t^\lambda)c_{t,j_t^\lambda}
-        +
-        \ind{D_t^\lambda\;\textnormal{or}\;t\in I_{\mathrm{cal}}}c_{t,E}
-    \right]
-    + C^{\mathrm{train}}/T,
-    \label{eq:total-cost}
-\end{equation}
-where $C^{\mathrm{train}}$ denotes expert-labeling cost used only for proxy
-training and not for final target labels.
-This formula separates expert labels used for final deferral from expert
-labels used for statistical certification.
+% \paragraph{Audit-or-correction cost.}
+% In the offline setting, calibration labels play the role that audits play
+% online.
+% If calibration items are part of the target pool and are corrected to expert
+% labels in the released dataset, then there is no duplicate expert cost for
+% those items.
+% The total realized end-to-end cost can be written as
+% \begin{equation}
+%     C_T^{\mathrm{total}}(\lambda)
+%     =
+%     \frac1T\sum_{t=1}^T
+%     \left[
+%         (1-D_t^\lambda)c_{t,j_t^\lambda}
+%         +
+%         \ind{D_t^\lambda\;\textnormal{or}\;t\in I_{\mathrm{cal}}}c_{t,E}
+%     \right]
+%     + C^{\mathrm{train}}/T,
+%     \label{eq:total-cost}
+% \end{equation}
+% where $C^{\mathrm{train}}$ denotes expert-labeling cost used only for proxy
+% training and not for final target labels.
+% This formula separates expert labels used for final deferral from expert
+% labels used for statistical certification.
 
-\paragraph{Online audit cost.}
-For Algorithm~\ref{alg:online-audited}, the conditional expected round-$t$
-cost under audit-and-correct is
-\[
-    \E[C_t\mid\calG_t]
-    =
-    D_t+(1-D_t)p_t .
-\]
-This identity isolates the extra expert cost paid to obtain online feedback;
-it is not a cost-regret guarantee.
+% \paragraph{Online audit cost.}
+% For Algorithm~\ref{alg:online-audited}, the conditional expected round-$t$
+% cost under audit-and-correct is
+% \[
+%     \E[C_t\mid\calG_t]
+%     =
+%     D_t+(1-D_t)p_t .
+% \]
+% This identity isolates the extra expert cost paid to obtain online feedback;
+% it is not a cost-regret guarantee.
 
 \end{document}
