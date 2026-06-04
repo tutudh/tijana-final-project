@@ -21,7 +21,7 @@
 }
 
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{0.5\baselineskip}
+\setlength{\parskip}{0.4\baselineskip}
 
 \makeatletter
 \renewcommand\section{\@startsection{section}{1}{\z@}%
@@ -196,37 +196,26 @@ the dual minimization separates across items, and the action for item $t$ is giv
 The dual price $\lambda$ balances the trade-off between cost and error.
 
 \subsection{Roadmap}
-The LP perspective suggests a one-dimensional dual price $\lambda$ for trading
-off expert cost against labeling error. Since the oracle rule depends on the
-unknown losses \(h_t(a)\), the offline method below uses proxy losses
-\(\hath_t(a)\) to build a family of price-indexed policies. The proxy may be
-obtained from a labeled training split by regression, isotonic calibration,
-multicalibration, or any other supervised procedure. The certification theorem
-below does not require \(\hath\) to be conservative or well calibrated. Better
-proxies reduce cost; held-out calibration supplies validity.
-Throughout the offline analysis, \(\hath_t(a)\) is treated as a fixed proxy
-loss for item \(X_t\) and action \(a\); it may be a deterministic function of
-\(X_t\), or the output of a model trained on an independent split before the
-target pool is calibrated.
-For simplicity, we assume throughout that the itemwise losses used in the
-argmin rules are distinct across actions; in particular, \(h_t(a)\) is different
-for different \(a\), i.e., no ties occur.
+The LP view reduces the expert--error trade-off to a single dual price
+\(\lambda\). Because the oracle rule depends on the unknown losses \(h_t(a)\),
+we use proxy losses \(\hath_t(a)\), learned on an independent split or fixed in
+advance, to construct price-indexed policies. These proxies need not be
+conservative or calibrated: better proxies improve cost, while held-out
+calibration provides validity. We assume the itemwise losses in the argmin rules
+are distinct, so ties do not occur.
 
-In the \textbf{offline setting}, Section~\ref{sec:offline-certification} first
-estimates a certified price on a calibration set and then labels the target pool
-at the fixed price \(\hat\lambda\).
-    
-In the \textbf{online setting}, items arrive online and labels are revealed only intermittently through random audits.
-Whenever the true label is observed, we obtain feedback about the realized
-loss $h_t$ and update the price $\lambda_t$ through an online dual update.
+Section~\ref{sec:offline-certification} treats the \textbf{offline} case: estimate a
+certified price on a calibration set, then label the target pool at
+\(\hat\lambda\). 
+Section~\ref{sec:online-audited} treats the \textbf{online} case, where
+items arrive sequentially, audits reveal labels intermittently, and the price
+\(\lambda_t\) is updated from audited feedback.
 
 \section{Offline PAC Labeling}
 \label{sec:offline-certification}
 
-In this section, the offline procedure follows the operational order of the
-algorithm. First, we use a labeled calibration sample to select a certified
-price \(\hat\lambda\). Then we label the full target pool using the fixed price
-\(\hat\lambda\).
+We first use a labeled calibration sample to select a certified price
+\(\hat\lambda\), then label the target pool at this fixed price.
 
 \subsection{Price Estimation on a Calibration Set}
 \label{sec:calibration-selection}
@@ -344,9 +333,7 @@ compute \(j_t^\star\) and \(s_t\) from \eqref{eq:proxy-j-star}. If
 Otherwise, accept the routed cheap label and release
 \(\tildeY_t=\hatY_t^{(j_t^\star)}\).
 
-The overall offline labeling algorithm is summarized in Algorithm~\ref{alg:offline-fixed-price}.
-
-\begin{algorithm}[ht]
+\begin{algorithm}[htbp]
 \caption{Offline fixed-price labeling}
 \label{alg:offline-fixed-price}
 \begin{algorithmic}[1]
@@ -366,18 +353,16 @@ The overall offline labeling algorithm is summarized in Algorithm~\ref{alg:offli
 \end{algorithmic}
 \end{algorithm}
 
+\paragraph{Relation to PAC labeling.}
 
-
-\paragraph{Relation to PAC labeling}
-
-Under the single-source case, if we use uncertainty score as the proxy, $\hath_t = U_t$, then AI label is used when
+In the single-source case, using uncertainty score as the proxy
+\(\hath_t=U_t\), the AI label is used when
 \[
     \hath_t = U_t < 1/\hat\lambda.
 \]
-This corresponds to the threshold policy used in the original PAC labeling method \cite{candes2025paclabels}.
-Differently, the threshold used in our method is defined by the dual price motivated from the LP perspective.
-With multiple sources, $\hath_t$ is replaced by the
-itemwise minimum of the proxy losses.
+Thus the LP rule recovers the original PAC-labeling threshold family
+\cite{candes2025paclabels}; with multiple sources, \(U_t\) is replaced by
+\(\min_j\hath_t(j)\).
 
 
 \subsection{Offline PAC Guarantees}
@@ -394,9 +379,7 @@ indices, the released labels satisfy
     \label{eq:offline-pac-guarantee}
 \end{equation}
 \end{theorem}
-
-\noindent
-The proof is in Appendix~\ref{app:proofs}. The same calibration idea also gives
+The proof is in Appendix~\ref{app:offline-proofs}. The same calibration idea also gives
 an inductive version.
 
 \begin{corollary}[Generalization guarantee]
@@ -429,46 +412,30 @@ least \(1-\alpha-\delta\),
 \section{Online PAC Labeling via Audits}
 \label{sec:online-audited}
 
-The offline guarantee certifies a fixed policy after a labeled calibration
-stage.
-In an online data-curation problem, inputs arrive sequentially, decisions are
-made before future data are seen, and the loss of an AI-labeled item is
-unobserved unless an expert label is revealed.
-% Therefore the offline calibration argument cannot be reused directly.
-
-The natural online analogue is to keep a moving PAC-labeling threshold. 
-We propose a framework for online PAC
-labeling in which randomized audits provide the intermittent feedback needed to
-keep realized error controlled.
+In the online setting, inputs arrive sequentially and AI losses are unobserved
+unless an expert label is revealed. We therefore keep a moving PAC-labeling
+threshold and use randomized audits for intermittent feedback.
 
 \subsection{Online PAC Labeling Setup and Audited Feedback}
 \label{sec:online-free-ai}
 
 Following the action-cost notation in \eqref{eq:itemwise-loss-cost}, we focus
-on the regime
-\[
-    c_t(j)=0\quad\text{for all }t,j \in[k],
-    \qquad
+on the same regime where
+\(
+    c_t(j)=0 \;\forall t,j \in[k],
+    \,
     c_t(E)=1.
-\]
-The online goal is therefore the same as
-PAC labeling: label as many items as possible with AI while controlling the
-average error of the released dataset.  The difference is that data arrive
-sequentially, so the uncertainty threshold is updated over time.
+\)
+The goal is to label as many items as possible with AI while controlling the
+average error of the released dataset.
 
 At time $t$, the learner observes the input $X_t$, cheap model labels
 $\{\hatY_t^{(j)}\}_{j=1}^k$, and predictable proxy losses
 $\{\hath_t(j)\}_{j=1}^k$.  The proxy losses may be uncertainty scores,
 calibrated error estimates, or any predictable scores built from past
 expert/audit labels and current non-expert information.
-% \textcolor{orange}{(LT: This is the delicate point:
-% $\hath_t(j)$ may use $X_t$, cheap model outputs, past expert labels, and past
-% audits, but it cannot use the current expert label $Y_t$, the current audit
-% outcome $A_t$, or the current loss before the routing and audit decisions are
-% made.)}
-Though it cannot use the current expert label $Y_t$, the current audit
-outcome $A_t$, or the current loss before the routing and audit decisions are
-made.
+% \textcolor{orange}{Note: predictability excludes the current expert label,
+% audit draw, and loss before routing/audit decisions are made.}
 The algorithm first routes the item to the model with the smallest proxy loss:
 \begin{equation}
     j_t^\lambda 
@@ -491,15 +458,14 @@ $\lambda_t=0$.  The deferral decision is
     \label{eq:online-defer}
 \end{equation}
 If $D_t=1$, the item is sent to the expert and the released label is
-$\tildeY_t=Y_t$.  If $D_t=0$, the algorithm initially releases the routed AI
-label $\tildeY_t=\hatY_t^{(j_t^\lambda)}$.  This is exactly the PAC-labeling
-threshold form.  The multi-model extension is contained in the
-routed score $\hath_t^\lambda=\min_j\hath_t(j)$.
+$\tildeY_t=Y_t$.  
+Otherwise it initially releases the routed AI label. This is the PAC-labeling
+threshold form, with the multi-model extension contained in
+\(\hath_t^\lambda=\min_j\hath_t(j)\).
 
-The main online obstacle is partial feedback.  When an AI label is used, its
-true loss is unobserved unless the expert label is also revealed.  Therefore,
-after every AI decision, the algorithm uses an audit probability chosen in
-advance of the audit draw and before observing the current expert label:
+When an AI label is used, its true loss is unobserved unless the expert label is
+also revealed. After every AI decision, the algorithm uses an audit probability
+chosen before the audit draw and before observing the current expert label:
 \[
     A_t\sim\mathrm{Bernoulli}(p_t),
     \qquad p_t\in[p_{\min},1].
@@ -514,9 +480,8 @@ Define the counterfactual AI-decision loss
     =
     (1-D_t)\ell\bigl(Y_t,\hatY_t^{(j_t^\lambda)}\bigr).
 \]
-Deferral has zero loss because the expert label is used.  An unaudited AI
-decision may have nonzero loss, but that loss is not observed.  The update
-uses an internal target $\eps_0\le\eps$:
+Deferral has zero loss because the expert label is used. The update uses an
+internal target $\eps_0\le\eps$:
 \[
     \widehat Z_t
     =
@@ -529,7 +494,7 @@ uses an internal target $\eps_0\le\eps$:
         & \text{if the AI label is used and not audited}.
     \end{cases}
 \]
-The role of $\eps_0$ is to leave room for finite-horizon statistical guarantee:
+The role of $\eps_0$ is to leave room for the finite-horizon guarantee:
 the algorithm updates toward the internal target $\eps_0$, while the final PAC
 target is $\eps$.  Corollary~\ref{cor:online-pac-tuning} gives the condition
 under which choosing $\eps_0$ yields final error at most $\eps$.
@@ -539,23 +504,17 @@ The price update is
     \label{eq:online-price-update}
 \end{equation}
 where $\eta>0$ is a step size.
-When audited AI mistakes occur more often than the internal target
-\(\eps_0\), the update increases \(\lambda_t\), lowers the threshold
-\(1/\lambda_t\), and makes future routing more conservative.  When
-deferrals or low-error audits dominate, the price decreases and the algorithm
-allows more AI labels.
+Audited mistakes increase \(\lambda_t\), lowering \(1/\lambda_t\) and making
+future routing more conservative; deferrals or low-error audits decrease it.
 
 Let $G_t=\ell(Y_t,\tildeY_t)$ be the realized final loss after
-audit-and-correct.  Since audited AI errors are corrected (so loss becomes zero), and expert deferrals
-use the true label,
+audit-and-correct. Since audited AI errors and expert deferrals use the true
+label,
 \[
     G_t\le H_t.
 \]
-The reported final error is the realized error $G_t$ after audit-and-correct, whereas
-the counterfactual AI error tracks how often the routed AI label would have
-been wrong before correction.  This distinction is important: audits serve
-both as intermittent feedback for the moving PAC threshold and as corrections
-for the final dataset.
+Thus \(G_t\) is the final audit-and-correct loss, while \(H_t\) tracks the
+counterfactual AI loss used for feedback.
 
 \begin{algorithm}[ht]
 \caption{Audited online PAC labeling}
@@ -665,8 +624,10 @@ internal target $\eps_0\in[0,\eps]$, where $\eps\in[0,1]$.
 Then, for any fixed horizon $T$ and any $\delta\in(0,1)$, with probability at
 least $1-\delta$ over the audit randomness,
 \begin{equation}
+    \frac1T\sum_{t=1}^T G_t
+    \;\le\;
     \frac1T\sum_{t=1}^T H_t
-    \le
+    \;\le\;
     \eps_0
     +
     \frac{\Lambda_{\mathrm{on}}}{\eta T}
@@ -674,39 +635,26 @@ least $1-\delta$ over the audit randomness,
     \frac{1}{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}.
     \label{eq:online-H-bound}
 \end{equation}
-Consequently, if audited AI labels are corrected to expert labels in the final
-dataset, then
-\begin{equation}
-    \frac1T\sum_{t=1}^T G_t
-    \le
-    \eps_0
-    +
-    \frac{\Lambda_{\mathrm{on}}}{\eta T}
-    +
-    \frac{1}{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}.
-    \label{eq:online-G-bound}
-\end{equation}
+where \(G_t\) is the final audit-and-correct loss, while \(H_t\) tracks the
+counterfactual AI loss used for feedback.
 \end{theorem}
 
 \begin{corollary}[PAC-style online tuning]
 \label{cor:online-pac-tuning}
-Under the conditions of Theorem~\ref{thm:online-audited}, suppose
+Under the conditions of Theorem~\ref{thm:online-audited}, let
+\(\bar\Lambda_{\mathrm{on}}=\max\{\lambda_1,1/\rho+\eta/p_{\min}\}\) and
 \[
-    \eps_0
+    B_T
+    =
+    \frac{\bar\Lambda_{\mathrm{on}}}{\eta T}
     +
-    \frac{\Lambda_{\mathrm{on}}}{\eta T}
-    +
-    \frac{1}{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}
-    \le \eps,
+    \frac1{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}.
 \]
-with $\eps_0\ge0$.
-Then the audit-and-correct final labels satisfy
-\[
-    \frac1T\sum_{t=1}^T G_t\le\eps
-\]
-with probability at least $1-\delta$.
-With $\eta\asymp T^{-1/2}$ and constant $p_{\min}$, the slack is
-$O(T^{-1/2})$.
+If \(B_T\le\eps\), choose the internal target
+\(\eps_0\in[0,\eps-B_T]\), typically \(\eps_0=\eps-B_T\). Then the
+audit-and-correct final labels satisfy
+\(\frac1T\sum_{t=1}^T G_t\le\eps\) with probability at least \(1-\delta\).
+With \(\eta\asymp T^{-1/2}\) and constant \(p_{\min}\), \(B_T=O(T^{-1/2})\).
 \end{corollary}
 
 The proofs of Proposition~\ref{prop:online-unbiased},
@@ -714,51 +662,27 @@ Theorem~\ref{thm:online-audited}, and
 Corollary~\ref{cor:online-pac-tuning} are in
 Appendix~\ref{app:online-proofs}.
 
-\subsection{Offline versus Online Certification}
-
-The online theorem is deliberately different from the offline one.
-Offline calibration certifies a fixed candidate policy by evaluating it on a
-held-out labeled sample.
-Online auditing controls the long-run error of a moving policy by converting
-unobserved AI losses into an unbiased intermittent-feedback signal.
-The proxy losses again affect efficiency rather than validity, but in the
-online setting some audit or reveal mechanism is essential: without it, two
-streams can induce identical observations while having opposite AI-label
-correctness on every unaudited item.
-
 \section{Experiments}
 \label{sec:experiments}
 
-We run a small proof-of-concept study on ImageNet and ImageNetV2 using the
-confidence score already included in the data (the datasets provided for the
-last question of HW4).
-There is one cheap source, namely the model prediction, and one expert source,
-namely the ground-truth label. All reported numbers average over 500 random
-trials. Appendix~\ref{app:experiments} gives the implementation details and full
-sweeps, while Table~\ref{tab:experiment-main-results} gives representative
-results at \(\eps=0.10\). The experiments are meant to check three basic points.
+We run a proof-of-concept study on ImageNet and ImageNetV2 using the provided
+confidence score, with the model prediction as the cheap source and the
+ground-truth label as the expert. Table~\ref{tab:experiment-main-results}
+reports representative results at \(\eps=0.10\); all reported numbers average
+over 500 random trials. The experiments check three basic points.
 
 \begin{enumerate}[leftmargin=*]
     \item \textbf{One source.} With a single cheap source, the LP fixed-price
     rule reduces to the same scalar threshold family as the original PAC
-    labeling method. We therefore recover the original PAC behavior: at
-    \(\eps=0.10\), both methods have zero violations, and the expert-budget
-    savings are nearly identical on ImageNet and ImageNetV2
-    (Table~\ref{tab:offline-full-results}).
+    labeling method, and empirically recovers the same behavior.
 
     \item \textbf{Two sources.} We then add a second cheap source to create a
     simple routing problem. The LP rule can choose the lower-proxy source on
-    each item before deciding whether to defer to the expert. At \(\eps=0.10\),
-    it still has zero violations and saves more budget than the best calibrated
-    single-source baseline: \(0.7848\) versus \(0.4746\) on ImageNet, and
-    \(0.5457\) versus \(0.3587\) on ImageNetV2
-    (Table~\ref{tab:two-source-full-results}).
+    each item before deciding whether to defer to the expert, improving budget
+    savings over the best calibrated single-source baseline.
 
     \item \textbf{Online.} Finally, the audited online update also shows the
-    desired validity--cost tradeoff. For example, at \(\eps=0.10\) and audit
-    probability \(p=0.2\), both datasets have zero violations while saving
-    \(0.6115\) of the expert budget on ImageNet and \(0.4681\) on ImageNetV2
-    (Table~\ref{tab:online-full-results}).
+    desired validity--cost tradeoff under partial feedback.
 \end{enumerate}
 
 \begin{table}[htbp]
@@ -782,39 +706,26 @@ Online & ImageNet & Audited, \(p=0.2\) & 0.0737 & 0.0000 & 0.6115 \\
 Online & ImageNetV2 & Audited, \(p=0.2\) & 0.0783 & 0.0000 & 0.4681 \\
 \bottomrule
 \end{tabular}
-\caption{Representative results at \(\eps=0.10\). Full sweeps and
-implementation details are deferred to Appendix~\ref{app:experiments}.}
+\caption{Representative averages at \(\eps=0.10\).}
 \label{tab:experiment-main-results}
 \end{table}
+Full sweeps and
+implementation details are deferred to Appendix~\ref{app:experiments}.
 
 \section{Discussion}
 
-The report separates two regimes.
-The offline method has a clean division of labor.
-The proxy model and the LP structure make the policy cost efficient; the
-calibration set makes it valid.
-When instantiating the method, the main modeling choice is whether the target
-is transductive or inductive.
-If the application is dataset curation for a fixed unlabeled pool, the
-transductive theorem should be the main result.
-If the application is repeated deployment on future items, the inductive
-statement should be foregrounded.
-The online method addresses a different obstacle: the selected policy changes
-over time and AI losses are not observed without expert reveal.
-Random audits supply the missing feedback through an inverse-probability loss
-estimate.
-This gives finite-horizon error control, but not a cost-regret comparison to
-the offline oracle LP.
-The experiments in Section~\ref{sec:experiments} illustrate this distinction:
-offline calibration gives a clean held-out certificate, while the online
-mechanism exposes an explicit audit-cost versus correction tradeoff.
-The main empirical limitation is that the current data contain only one cheap
-source.
-A stronger test of the LP perspective would use several cheap sources with
-heterogeneous costs, where the original scalar threshold structure no longer
-captures the routing problem.
+Offline calibration certifies a fixed policy on a held-out labeled sample,
+while online auditing controls a moving policy by converting hidden AI losses
+into an unbiased intermittent-feedback signal. In both regimes, proxies affect
+efficiency rather than validity. The main empirical limitation is that the
+current data contain only one cheap source. A stronger test would use several
+cheap sources with heterogeneous costs, where a scalar threshold alone no
+longer captures the routing problem.
 
-\clearpage
+
+\bibliographystyle{unsrt}
+\bibliography{ref}
+
 \appendix
 
 \section{Related Work}
@@ -941,6 +852,8 @@ loss, and it is bounded because costs are nonnegative and finite.
 Therefore strong duality holds by finite-dimensional linear programming
 duality.
 
+\subsection{Offline Proofs}
+\label{app:offline-proofs}
 \paragraph{Proof of Theorem~\ref{thm:offline-fixed-price-pac}.}
 Condition on the fixed target pool, labels, and proxy losses from the theorem.
 The routed source \(j_t^\star\in\argmin_j\hath_t(j)\), the routed score
@@ -1167,21 +1080,22 @@ Because
     T\eps_0+\sum_{t=1}^T\widehat Z_t+\sum_{t=1}^T M_t,
 \]
 combining the last displays gives \eqref{eq:online-H-bound}.
-Finally, audit-and-correct gives $G_t\le H_t$ pointwise, which proves
-\eqref{eq:online-G-bound}. \hfill$\square$
+The same display includes the final-loss bound because audit-and-correct gives
+$G_t\le H_t$ pointwise. \hfill$\square$
 
 \paragraph{Proof of Corollary~\ref{cor:online-pac-tuning}.}
-The stated condition makes the right-hand side of
-\eqref{eq:online-G-bound} at most $\eps$.
-If $\eta\asymp T^{-1/2}$, $p_{\min}$ is constant, and the proxy floor is fixed
-so that $\Lambda_{\mathrm{on}}=O(1)$, then both excess terms in
-\eqref{eq:online-G-bound} are $O(T^{-1/2})$. \hfill$\square$
+Since \(\eps_0\ge0\), we have
+\(\Lambda_{\mathrm{on}}\le\bar\Lambda_{\mathrm{on}}\). Hence the choice
+\(\eps_0\le\eps-B_T\) makes the right-hand side of
+\eqref{eq:online-H-bound} at most \(\eps\). If
+\(\eta\asymp T^{-1/2}\), \(p_{\min}\) is constant, and the proxy floor is
+fixed, then \(B_T=O(T^{-1/2})\). \hfill$\square$
 
 \section{Experimental Details}
 \label{app:experiments}
 
-The experiments use the two ImageNet CSV files from the HW4 copy directory:
-ImageNet has $T=50000$ items and ImageNetV2 has $T=10000$ items.
+The experiments use two ImageNet prediction tables: ImageNet has $T=50000$
+items and ImageNetV2 has $T=10000$ items.
 Each file contains a ground-truth label, a model prediction, and a confidence
 score.
 We treat the model prediction as the only cheap source and the ground-truth
@@ -1189,10 +1103,6 @@ label as the expert.
 The proxy loss is $\hath=1-\textnormal{confidence}$, the cheap-source
 deployment cost is zero, and the expert cost is one.
 All experiments use 500 random trials.
-The scripts are
-\texttt{run\_simple\_offline\_\allowbreak pac\_experiment.py},
-\texttt{run\_simple\_online\_\allowbreak pac\_experiment.py}, and
-\texttt{run\_two\_source\_offline\_\allowbreak pac\_experiment.py}.
 
 \paragraph{Offline implementation.}
 For the fixed-price method, the candidate threshold grid contains the
@@ -1215,7 +1125,8 @@ The original PAC baseline uses the same calibration sample and the same
 monotone radius, but chooses its threshold directly from the calibration
 mistake order instead of from the fixed grid. The full sweep over
 $\eps\in\{0.05,0.10,0.15\}$ is reported in
-Table~\ref{tab:offline-full-results}.
+Table~\ref{tab:offline-full-results} and visualized in
+Figure~\ref{fig:simple-offline-summary}.
 
 \begin{table}[htbp]
 \centering
@@ -1249,24 +1160,31 @@ by light rules.}
 \label{tab:offline-full-results}
 \end{table}
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{experiments/results/simple_offline_pac/simple_offline_pac_summary.png}
+\caption{Simple offline sweep. The fixed-price LP rule tracks the original PAC
+baseline closely in both budget saved and realized error; the gray line is the
+target error.}
+\label{fig:simple-offline-summary}
+\end{figure}
+
 \paragraph{Two-source implementation.}
-\texttt{run\_two\_source\_offline\_pac\_experiment.py} constructs two
-complementary cheap sources from each base ImageNet table. Items are partitioned
-by the parity of the true class label. On items inside its specialty, a source
-reuses the original predictor's label and confidence; outside its specialty, it
-emits a random label with low confidence. The construction is seeded separately
-from the trial sampler so the synthesized pool is fixed across trials; defaults
-are \texttt{--synth-seed 20260526} and \texttt{--low-conf-max 0.2}. The
-calibration grid contains the expert-only policy plus 201 evenly spaced
-thresholds on $\min_j\hath_{t}(j)$, the calibration size is $m=0.2T$, and
-$\alpha=0.05$. The LP method uses the monotone radius
+The two-source experiment constructs two complementary cheap sources from each
+base ImageNet table. Items are partitioned by the parity of the true class
+label. On items inside its specialty, a source reuses the original predictor's
+label and confidence; outside its specialty, it emits a random low-confidence
+label. The synthesized pool is fixed across trials. The calibration grid
+contains the expert-only policy plus 201 evenly spaced thresholds on
+$\min_j\hath_{t}(j)$, the calibration size is $m=0.2T$, and $\alpha=0.05$.
+The LP method uses the monotone radius
 $\sqrt{\log(1/\alpha)/(2m)}$; the
 Bonferroni-corrected best-of-singles baseline runs both single-source
 baselines at $\alpha/2$ each and reports the one with larger empirical
-savings on the calibration sample. Constructed-pool statistics are written
-to \texttt{results/two\_source\_offline\_pac/two\_source\_offline\_pac\_construction.csv}.
+savings on the calibration sample.
 The full sweep over $\eps\in\{0.05,0.10,0.15\}$ for all four methods is in
-Table~\ref{tab:two-source-full-results}.
+Table~\ref{tab:two-source-full-results} and
+Figure~\ref{fig:two-source-offline-summary}.
 
 \begin{table}[htbp]
 \centering
@@ -1313,6 +1231,15 @@ saved in each scenario is shown in bold.}
 \label{tab:two-source-full-results}
 \end{table}
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{experiments/results/two_source_offline_pac/two_source_offline_pac_summary.png}
+\caption{Two-source offline sweep. LP routing saves substantially more expert
+budget than the single-source baselines while keeping realized error below the
+target line.}
+\label{fig:two-source-offline-summary}
+\end{figure}
+
 \paragraph{Online implementation.}
 For each trial, the target pool is randomly permuted into a stream.
 The update uses $\eta=1$, proxy floor $\rho=0.01$, and
@@ -1334,7 +1261,8 @@ As noted in Section~\ref{sec:experiments}, these runs set $\eps_0=\eps$
 rather than subtracting the finite-horizon slack from
 Corollary~\ref{cor:online-pac-tuning}. The full sweep over
 $\eps\in\{0.05,0.10,0.15\}$ and $p\in\{0.1,0.2,0.5\}$ is reported in
-Table~\ref{tab:online-full-results}.
+Table~\ref{tab:online-full-results} and
+Figure~\ref{fig:simple-online-summary}.
 
 \begin{table}[htbp]
 \centering
@@ -1373,6 +1301,16 @@ averages over 500 trials. Rows are grouped by (dataset, $\eps$) scenario and
 separated by light rules.}
 \label{tab:online-full-results}
 \end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{experiments/results/simple_online_pac/simple_online_pac_summary.png}
+\caption{Online audited sweep. Smaller audit probabilities save more expert
+budget, while larger audit probabilities lower final released-label error by
+correcting more AI outputs. Dashed lines show counterfactual AI error before
+audit correction.}
+\label{fig:simple-online-summary}
+\end{figure}
 
 \section{Alternative Confidence Bounds}
 
@@ -1565,8 +1503,5 @@ cost under audit-and-correct is
 \]
 This identity isolates the extra expert cost paid to obtain online feedback;
 it is not a cost-regret guarantee.
-
-\bibliographystyle{unsrt}
-\bibliography{ref}
 
 \end{document}
