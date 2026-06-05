@@ -11,9 +11,6 @@
     \medskip
 
     \textbf{Two Goals}: 
-    % Use the cheap models as much as possible, while
-    % \emph{guaranteeing} the average error of the released dataset stays
-    % below a target $\eps$.
     \begin{itemize}
       \item Save cost by reducing the number of expert queries.
       \item Probably Approximately Correct (PAC) guarantee:
@@ -43,7 +40,8 @@
   \end{itemize}
   \vfill
   \centering
-  \footnotesize\textcolor{accent}{Key quantities: \emph{cost} we want to minimize, \emph{error} we must control.}
+  % \footnotesize
+  \textcolor{accent}{Two goals: minimize \emph{cost}, control the labeling \emph{error}.}
 \end{frame}
 
 % --------------------------------------------------------- SETUP DIAGRAM
@@ -100,50 +98,67 @@
   \]
   \vfill
   \begin{itemize}
-    \item \textbf{One} global constraint: keep average error $\le\eps$.
-    \item Naturally handles \emph{multiple} cheap sources and item-specific costs.
+    \item Models multi-sources setting and item-specific costs.
     \item If true losses $h_t(a)$ were known, this LP is the \emph{optimal} policy.
   \end{itemize}
 \end{frame}
 
 % --------------------------------------------------------- DUAL / PRICE
-\begin{frame}{The dual gives a single ``price of error''}
+\begin{frame}{Dual problem and shadow price}
   One Lagrange multiplier $\lambda\ge 0$ for the error constraint. The dual:
   \[
      \max_{\lambda\ge0}\; -\lambda\eps
        +\frac1T\sum_{t=1}^{T}\min_{a\in\calA}\bigl\{c_t(a)+\lambda\,h_t(a)\bigr\}.
   \]
-  \begin{block}{The fixed-price rule}
-    Once $\lambda$ is fixed, the decision \textbf{separates across items}:
+  \begin{block}{Simple decision rule from the shadow price}
+    Given a fixed-price $\lambda$, the corresponding primal decision is given by:
     \[
        a_t(\lambda)\in\argmin_{a\in\calA}\bigl\{c_t(a)+\lambda\,h_t(a)\bigr\}.
     \]
   \end{block}
-  \centering
-  $\lambda$ is the exchange rate between cost and error.\\
-  Small $\lambda \Rightarrow$ trust AI \quad\textbar\quad Large $\lambda \Rightarrow$ defer to expert.
+
+  \medskip
+  \begin{itemize}
+    \item {Since $h_t(a)$ is unknown, we can replace it with an estimate $\hath_t(a)$.}
+    \item The PAC guarantee does not require $\hath_t(a)$ to be accurate, this affects the labeling cost.
+  \end{itemize}
+  
+
 \end{frame}
 
 % ----------------------------------------------------- THRESHOLD FORM
-\begin{frame}{What the price actually does: a threshold}
-  With equal cheap-source costs, first \textbf{route} to the best cheap model
+\begin{frame}{Price gives a threshold policy}
+  Since $c_t(j)=0$ and $c_t(E)=1$  for $j\in[k]$, the decision rule is equivalent to:
   \[
      j_t^\star \in \argmin_{j\in[k]}\hath_t(j),
-     \qquad s_t=\min_{j}\hath_t(j) \quad(\text{the ``uncertainty score''}).
+     \qquad s_t=\min_{j}\hath_t(j) \quad(\text{the least uncertainty score}).
   \]
-  Then $\lambda$ only decides \emph{accept vs.\ defer} via a threshold $1/\lambda$:
   \[
-     \boxed{\;s_t \ge 1/\lambda \;\Rightarrow\; \text{defer to expert}\;}
+     {\;s_t \ge 1/\lambda \;\Rightarrow\; \text{defer to expert}\;}
      \qquad
-     s_t < 1/\lambda \;\Rightarrow\; \text{accept cheap label.}
+     s_t < 1/\lambda \;\Rightarrow\; \text{route to model $j_t^\star$}.
   \]
   \vfill
   \begin{itemize}
     \item Recovers the original \textbf{PAC-labeling} threshold rule
           (single source: $\hath_t=$ uncertainty).
-    \item Multi-source extension is ``free'': just replace the score by
-          $\min_j \hath_t(j)$.
-    \item Two regimes ahead: \textbf{offline} (fix $\lambda$ once) and
+    \item Multi-source setting: use least uncertain model as the routing rule.
+    \item Two regimes ahead: \textbf{offline} (estimate $\hat \lambda$ on a calibration set) and
           \textbf{online} (move $\lambda_t$ over time).
   \end{itemize}
+\end{frame}
+
+\begin{frame}{Overview}
+  Given a fixed-price $\lambda$, the cost-aware labeling LP gives a simple threshold policy.
+
+\bigskip
+  \centering{
+  {\textcolor{accent}{Since we use proxy $\hath$, how to select $\lambda$ such that we have PAC guarantees?}}
+  }
+\bigskip
+  \begin{itemize}
+    \item \textbf{Offline} setting: fixed pool of $T$ items, estimate $\hat \lambda$ from a calibration set.
+    \item \textbf{Online} setting: items arrive sequentially, we update price $\lambda_t$ onlinely.
+  \end{itemize}
+
 \end{frame}
