@@ -123,11 +123,11 @@ slack on the next slide.}
           approaches $\eps$ as the stream grows.
   \end{itemize}
   % \vspace{-2pt}
-  \footnotesize\textcolor{accent}{assume proxy floor
-  ($\hath_t\ge\rho$), $\Lambda_{\mathrm{on}}=\max\bigl\{\lambda_1,\;
-  1/\rho+\eta(1-\eps)/p_{\min}\bigr\}$ caps the price: once
-  $\lambda_t\ge1/\rho$, the threshold $1/\lambda_t \le \rho $ drops below proxy floor, 
-  so \emph{every} item defers, and $\lambda_t$ can no longer increase.}
+  % \footnotesize\textcolor{accent}{assume proxy floor
+  % ($\hath_t\ge\rho$), $\Lambda_{\mathrm{on}}=\max\bigl\{\lambda_1,\;
+  % 1/\rho+\eta(1-\eps)/p_{\min}\bigr\}$ caps the price: once
+  % $\lambda_t\ge1/\rho$, the threshold $1/\lambda_t \le \rho $ drops below proxy floor, 
+  % so \emph{every} item defers, and $\lambda_t$ can no longer increase.}
 \end{frame}
 \note{%
 \textbf{The result ($\approx$0:20).} Headline: for \emph{any} data sequence ---
@@ -160,14 +160,14 @@ target to tune.)}
 
 % -------------------------------------------------- ONLINE EXPERIMENT
 \begin{frame}{Online experiments}
-  \begin{columns}[T]
-    \begin{column}{0.6\textwidth}
-      \centering
-      \includegraphics[width=0.90\linewidth]{simple_online_pac_summary.png}
-      {\scriptsize Audited online sweep. Dashed = AI error before correction.}
-    \end{column}
-    \begin{column}{0.4\textwidth}
-      \small
+  % \begin{columns}[T]
+  %   % \begin{column}{0.6\textwidth}
+  %   %   \centering
+  %   %   \includegraphics[width=0.90\linewidth]{simple_online_pac_summary.png}
+  %   %   {\scriptsize Audited online sweep. Dashed = AI error before correction.}
+  %   % \end{column}
+  %   \begin{column}{0.4\textwidth}
+  %     \small
       \textbf{Online} ($\eps=0.10$):
       \vspace{-1mm}
       \begin{center}
@@ -190,8 +190,8 @@ target to tune.)}
         \item Smaller $p$: save more budget.
         \item Larger $p$: correct more, lower final error.
       \end{itemize}
-    \end{column}
-  \end{columns}
+    % \end{column}
+  % \end{columns}
 \end{frame}
 \note{%
 \textbf{One message ($\approx$0:25).} The audit rate $p$ is a dial between cost
