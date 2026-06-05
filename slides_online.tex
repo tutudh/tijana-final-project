@@ -1,4 +1,9 @@
 % =====================================================================
+%  ONLINE SECTION  (~5 minutes)
+%  Speaker: in charge of the online part.
+%  Presenter notes live in the \note{} blocks below each frame.
+%  To print them, add  \setbeameroption{show notes}  to slides.tex.
+% =====================================================================
 \section{Online}
 \begin{frame}[plain]
   \centering
@@ -7,61 +12,161 @@
   \normalsize Items stream in; labels are hidden unless we audit.
   \vfill
 \end{frame}
+\note{%
+\textbf{Transition ($\approx$0:10).} Offline we certified \emph{one} price on the
+whole pool. Now data arrives as a \emph{stream}: we never see the full pool up
+front, so the price must adapt as we go. Keep it to one sentence and move on.}
 
 % ----------------------------------------------------- ONLINE SETUP
-\begin{frame}{Online: a moving threshold + randomized audits}
-  Items arrive one at a time. AI losses are \emph{unobserved} unless we pay the expert.
-  \begin{itemize}
-    \item Keep a moving price $\lambda_t$; route then threshold:
-          $D_t=\ind{\hath_t^\lambda \ge 1/\lambda_t}$ (defer) .
-    \item If we use the AI label, \textbf{audit} it with probability
-          $p_t\in[p_{\min},1]$:
-          \[
-             A_t\sim\text{Bernoulli}(p_t).
-          \]
-          If audited, query the expert, \emph{correct} the label, and observe the AI's true error.
-  \end{itemize}
-  \begin{block}{Inverse-probability feedback}
-    \[
-       \widehat Z_t=\frac{O_t}{q_t}\,(H_t-\eps_0),
-       \qquad \E[\widehat Z_t\mid \mathcal{G}_t]=H_t-\eps_0 \;\;(\text{unbiased}).
-    \]
-    Audited rare errors are up-weighted by $1/p_t$ to stay unbiased.
-  \end{block}
-\end{frame}
+\begin{frame}{Online PAC: moving threshold with randomized audits}
+  Items arrive one at a time. An AI label's true loss is \emph{hidden} unless we
+  pay the expert.
+  \medskip
 
-% ----------------------------------------------------- ONLINE UPDATE
-\begin{frame}{Online: the price update}
-  \[
-     \lambda_{t+1}=\bigl[\lambda_t+\eta\,\widehat Z_t\bigr]_+.
-  \]
+  Maintain a \textbf{moving price} $\lambda_t$, i.e.\ a threshold $1/\lambda_t$.
+  Each round, route to the best model ($s_t=\min_j\hath_t(j)$), then:
   \begin{itemize}
-    \item An audited \textbf{mistake} pushes $\lambda_t$ \emph{up} $\Rightarrow$
-          threshold $1/\lambda_t$ drops $\Rightarrow$ routing gets more conservative.
-    \item A \textbf{deferral} or a clean audit pushes $\lambda_t$ \emph{down}
-          $\Rightarrow$ trust the AI more.
-    \item Internal target $\eps_0\le\eps$ leaves slack for the finite-horizon bound.
+    \item $s_t \ge 1/\lambda_t$:\; \textbf{defer} $\to$ expert label (correct).
+    \item $s_t < 1/\lambda_t$:\; release the AI label, then \textbf{audit} it
+          with probability $p$.
   \end{itemize}
-  \begin{block}{Theorem (audited online finite-horizon control)}
-    With probability $\ge 1-\delta$ over audit randomness, for \emph{any} data sequence,
-    \[
-       \frac1T\sum_{t=1}^{T} G_t \;\le\;
-       \eps_0+\frac{\Lambda_{\mathrm{on}}}{\eta T}
-       +\frac{1}{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}.
-    \]
-    Choosing $\eta\asymp T^{-1/2}$ gives final error $\le\eps$, slack $O(T^{-1/2})$.
+  \medskip
+
+  \begin{block}{Audit}
+    With probability $p$: query the expert, \emph{correct} the released label,
+    and \emph{reveal} the AI's true loss $\ell_t$.
   \end{block}
+  \centering
+  \footnotesize\textcolor{accent}{Audits buy occasional, randomized feedback ---
+  just enough to steer the price.}
 \end{frame}
+\note{%
+\textbf{The obstacle ($\approx$0:30).} The new difficulty vs.\ offline: once we
+release an AI label we normally \emph{never learn} whether it was right --- the
+loss $\ell(Y_t,\hatY_t)$ is hidden unless we pay the expert. So we cannot just
+measure our running error rate.\\[2pt]
+\textbf{The loop ($\approx$0:45).} Each round we hold a current price
+$\lambda_t$, equivalently a threshold $1/\lambda_t$ on the uncertainty score
+$s_t$. Route to the lowest-proxy model; if it is too uncertain
+($s_t\ge1/\lambda_t$) defer to the expert (always correct). Otherwise release
+the AI label, then flip a coin: with probability $p$ \emph{audit} it --- pay the
+expert, correct the label, and crucially \emph{observe the AI's true loss}.
+Audits are our only window into AI quality, and we keep them rare to stay cheap.
+That observed $\ell_t$ is what drives the price update on the next slide.}
+
+% ----------------------------------------------------- PRICE UPDATE
+\begin{frame}{The price update: learn from audited feedback}
+  \begin{block}{Dual ascent on the price}
+    \[
+       \lambda_{t+1}=\bigl[\,\lambda_t+\eta\,\widehat Z_t\,\bigr]_+,
+       \qquad
+       \widehat Z_t=
+       \begin{cases}
+         -\eps, & \text{deferred to expert},\\[2pt]
+         (\ell_t-\eps)/p, & \text{AI label \emph{audited}},\\[2pt]
+         0, & \text{AI label, not audited}.
+       \end{cases}
+    \]
+  \end{block}
+  \begin{itemize}
+    \item Audited \textbf{mistake} ($\ell_t>\eps$) $\Rightarrow \widehat Z_t>0
+          \Rightarrow \lambda \uparrow\, \Rightarrow$ threshold $1/\lambda
+           \downarrow\,\Rightarrow$ defer more.
+    \item Deferral or clean audit $\Rightarrow \lambda \downarrow\,\Rightarrow$
+          trust the AI more.
+    \item The $1/p$ re-weighting makes rare audits count correctly:
+          on average the update sees the true AI error,
+          $\;\E[\widehat Z_t\mid\text{past}]=(\text{AI error before audit})-\eps$.
+  \end{itemize}
+  \centering
+  \vspace{5pt}
+  \footnotesize\textcolor{accent}{$\eta$: step size \quad\textbar\quad
+  $\eps$: target error (the update centers on it directly).}
+\end{frame}
+\note{%
+\textbf{The update ($\approx$0:25).} This is the heart of the online method:
+projected dual ascent on the price, $\lambda_{t+1}=[\lambda_t+\eta\widehat
+Z_t]_+$, where $\widehat Z_t$ is this round's feedback.\\[2pt]
+\textbf{Three cases ($\approx$0:25).} If we deferred, the signal is $-\eps$:
+nudge the price \emph{down}, we were safe. If we used the AI and \emph{audited},
+the signal is $(\ell_t-\eps)/p$ --- an audited loss above the target $\eps$
+pushes the price \emph{up}, one below pulls it down. If we used the AI but did
+not audit, we learned nothing, so $\widehat Z_t=0$.\\[2pt]
+\textbf{Why the $1/p$ ($\approx$0:25).} Audits are rare, so each audited item
+must stand in for the $\sim\!1/p$ items we did not audit --- inverse-probability
+weighting. That is exactly what makes the update \emph{unbiased}: in expectation
+it behaves as if we had seen every AI loss,
+$\E[\widehat Z_t\mid\text{past}]=(\text{AI error})-\eps$. Net behavior:
+mistakes raise the price, the threshold drops, we defer more; clean rounds lower
+it and we lean on the AI. The update centers directly on the target $\eps$ ---
+there is no separate internal target; the only gap to $\eps$ is the vanishing
+slack on the next slide.}
+
+% ----------------------------------------------------- GUARANTEE / BOUND
+\begin{frame}{Finite-horizon guarantee}
+  \begin{block}{Theorem (audited online control)}
+    For \emph{any} data sequence, with probability $\ge 1-\delta$ over the audit draws,
+    \[
+      \frac1T\sum_{t=1}^{T}\ell(Y_t,\tildeY_t)\;\le\;
+      \eps
+      +\underbrace{\frac{\Lambda_{\mathrm{on}}}{\eta T}}_{\substack{\text{optimization}\\ O(1/T)}}
+      +\underbrace{\frac{1}{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}}_{\substack{\text{partial feedback}\\ O(1/\sqrt T)}}
+      \;=\;\eps+B_T.
+    \]
+  \end{block}
+  \begin{itemize}
+    % \item $\eps$: the target error the update steers toward.
+    \item $\Lambda_{\mathrm{on}}/(\eta T)$: how far the price can drift; vanishes like $1/T$.
+    \item $\tfrac{1}{p_{\min}}\sqrt{\cdots}$: noise from auditing only a fraction;
+          smaller audit rate $\Rightarrow$ larger.
+    \item $B_T=O(T^{-1/2})\to0$, so the released error
+          approaches $\eps$ as the stream grows.
+  \end{itemize}
+  % \vspace{-2pt}
+  \footnotesize\textcolor{accent}{assume proxy floor
+  ($\hath_t\ge\rho$), $\Lambda_{\mathrm{on}}=\max\bigl\{\lambda_1,\;
+  1/\rho+\eta(1-\eps)/p_{\min}\bigr\}$ caps the price: once
+  $\lambda_t\ge1/\rho$, the threshold $1/\lambda_t \le \rho $ drops below proxy floor, 
+  so \emph{every} item defers, and $\lambda_t$ can no longer increase.}
+\end{frame}
+\note{%
+\textbf{The result ($\approx$0:20).} Headline: for \emph{any} data sequence ---
+no distributional assumptions, the only randomness is our audit coins --- with
+probability $1-\delta$ the average \emph{released} error is bounded by three
+pieces. Distribution-free, even adversarial data.\\[2pt]
+\textbf{Read the bound term by term ($\approx$0:40).} (1) $\eps$ is the target
+the update steers toward. (2) $\Lambda_{\mathrm{on}}/(\eta T)$ is optimization
+error --- how far the price can wander before it settles --- and it decays like
+$1/T$. $\Lambda_{\mathrm{on}}=\max\{\lambda_1,\,1/\rho+\eta(1-\eps)/p_{\min}\}$
+is an explicit constant ceiling on the price, and here is \emph{why} the price
+can't run away: the proxy is floored at $\rho$ ($\hath_t\ge\rho$), so the moment
+$\lambda_t$ reaches $1/\rho$ the threshold $1/\lambda_t$ falls to $\rho$ or
+below --- every item then looks ``too uncertain'' and defers, which only pushes
+the price back down. A single update can overshoot that level by at most one
+step $\eta(1-\eps)/p_{\min}$, giving the formula. (3) the last term is the \emph{price
+of partial feedback}: because we audit only a fraction of items there is sampling
+noise scaling like $1/\sqrt T$, and it inflates as the audit floor $p_{\min}$
+shrinks --- fewer audits, noisier estimate. So: target $+$ a fast optimization
+term $+$ a slower feedback term, bundled as $B_T$.\\[2pt]
+\textbf{AI error vs.\ released error ($\approx$0:10).} Technically the bound is
+on the AI's \emph{counterfactual} error, but every audited mistake is corrected
+before release, so the error we actually ship is only smaller. Control the AI
+error, control the dataset.\\[2pt]
+\textbf{The slack vanishes ($\approx$0:15).} The update centers on $\eps$
+directly, so the only gap to the target is $B_T=O(T^{-1/2})$. With $\eta$ of
+order $1/\sqrt T$ that slack goes to zero --- for a long stream the released
+error approaches $\eps$ while we still skip most experts. (No separate internal
+target to tune.)}
 
 % -------------------------------------------------- ONLINE EXPERIMENT
-\begin{frame}{Online experiments: the validity--cost knob}
+\begin{frame}{Online experiments}
   \begin{columns}[T]
-    \begin{column}{0.52\textwidth}
+    \begin{column}{0.6\textwidth}
       \centering
       \includegraphics[width=\linewidth]{simple_online_pac_summary.png}
       {\scriptsize Audited online sweep. Dashed = AI error before correction.}
     \end{column}
-    \begin{column}{0.48\textwidth}
+    \begin{column}{0.4\textwidth}
       \small
       \textbf{Online} ($\eps=0.10$):
       \begin{table}\centering\scriptsize
@@ -72,7 +177,9 @@
         IN   & 0.1 & 0.078 & 0.663 \\
         IN   & 0.2 & 0.074 & 0.612 \\
         IN   & 0.5 & 0.049 & 0.395 \\
+        INv2 & 0.1 & 0.086 & 0.509 \\
         INv2 & 0.2 & 0.078 & 0.468 \\
+        INv2 & 0.5 & 0.050 & 0.301 \\
         \bottomrule
       \end{tabular}
       \end{table}
@@ -80,11 +187,24 @@
       \begin{itemize}
         \item Smaller $p$: save more budget.
         \item Larger $p$: correct more, lower final error.
-        \item Released-label error tracked below target under partial feedback.
+        \item The audit rate $p$ trades cost vs.\ error
       \end{itemize}
     \end{column}
   \end{columns}
 \end{frame}
+\note{%
+\textbf{One message ($\approx$0:25).} The audit rate $p$ is a dial between cost
+and validity. Same data --- ImageNet / ImageNetV2, 500 trials, $\eps=0.10$.
+Small $p=0.1$ audits little, so we save the most budget ($\sim$0.66) but correct
+few labels, leaving final error near the target. Large $p=0.5$ audits
+aggressively: savings drop to $\sim$0.40, but final error falls to $\sim$0.05
+because we fix more AI mistakes.\\[2pt]
+\textbf{The figure ($\approx$0:20).} Dashed curve = AI error before correction
+(sits near $\eps$ --- that is the quantity the theorem bounds); solid = error
+after audit-and-correct (strictly lower). The gap between them \emph{is} the
+value of auditing. Bottom line: even with feedback on only a fraction of items,
+the released-label error stays controlled --- the online guarantee in practice.
+Then hand to the closing slide.}
 
 % --------------------------------------------------------- CONCLUSION
 \begin{frame}{Takeaways}
@@ -101,14 +221,14 @@
     \begin{column}{0.5\textwidth}
       \textbf{What we showed}
       \begin{itemize}
-        \item Proxies affect \emph{cost}, not \emph{validity}.
+        \item Proxies $\hath_t$ affect \emph{cost}, not \emph{validity}.
         \item LP rule matches PAC with one source; \emph{routing wins} with two.
         \item Online stays valid under partial feedback; $p$ trades cost vs.\ error.
       \end{itemize}
     \end{column}
   \end{columns}
   \vfill
-  \begin{block}{Limitation \& next step}
+  \begin{block}{Next step}
     Current data has only one real cheap source. The interesting case is many
     sources with \emph{heterogeneous costs}, where a scalar threshold no longer
     suffices.
@@ -116,3 +236,10 @@
   \vfill
   \centering\textbf{\color{accent}Thank you! \quad Questions?}
 \end{frame}
+\note{%
+\textbf{Close ($\approx$0:20).} Tie the two halves together: one LP dual gives a
+single price of error; offline we \emph{certify} it on held-out labels, online
+we \emph{move} it with audited inverse-probability feedback --- and in both
+regimes proxies affect cost, never validity. Name the honest limitation (one
+real cheap source; heterogeneous-cost multi-source is the next step), thank the
+audience, and take questions.}
