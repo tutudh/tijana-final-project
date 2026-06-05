@@ -3,21 +3,21 @@
     We have a pool of unlabeled items $X_1,\dots,X_T$. Need to collect their true labels $Y_1,\dots,Y_T$.
     \medskip
 
-    Two ways to get a label $\tilde Y_t$:
+    \uncover<2->{Two ways to get a label $\tilde Y_t$:
     \begin{itemize}
       \item \textbf{ML models} $\hatY_t^{(a)}$ --- sometimes \emph{wrong}, but \emph{cheap}
       \item \textbf{Expert} $Y_t$ --- \emph{correct}, but \emph{expensive}.
     \end{itemize}
-    \medskip
+    \medskip}
 
-    \textbf{Two Goals}: 
+    \uncover<3->{\textbf{Two Goals}: 
     \begin{itemize}
       \item Save cost by reducing the number of expert queries.
       \item Probably Approximately Correct (PAC) guarantee:
       \[
        \frac1T\sum_{t=1}^{T}\ell(Y_t,\tildeY_t)\;\le\;\eps\quad w.p.\ge 1-\alpha.
       \]
-    \end{itemize}
+    \end{itemize}}
 \end{frame}
 
 % --------------------------------------------------------------- SETUP
