@@ -163,13 +163,15 @@ target to tune.)}
   \begin{columns}[T]
     \begin{column}{0.6\textwidth}
       \centering
-      \includegraphics[width=\linewidth]{simple_online_pac_summary.png}
+      \includegraphics[width=0.90\linewidth]{simple_online_pac_summary.png}
       {\scriptsize Audited online sweep. Dashed = AI error before correction.}
     \end{column}
     \begin{column}{0.4\textwidth}
       \small
       \textbf{Online} ($\eps=0.10$):
-      \begin{table}\centering\scriptsize
+      \vspace{-1mm}
+      \begin{center}
+      \scriptsize
       \begin{tabular}{lccc}
         \toprule
         Data & $p$ & Error & Saved \\
@@ -182,12 +184,11 @@ target to tune.)}
         INv2 & 0.5 & 0.050 & 0.301 \\
         \bottomrule
       \end{tabular}
-      \end{table}
-      \medskip
-      \begin{itemize}
+      \end{center}
+      \vspace{-2mm}
+      \begin{itemize}\scriptsize
         \item Smaller $p$: save more budget.
         \item Larger $p$: correct more, lower final error.
-        \item The audit rate $p$ trades cost vs.\ error
       \end{itemize}
     \end{column}
   \end{columns}
