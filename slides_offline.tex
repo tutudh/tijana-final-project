@@ -10,23 +10,61 @@
 
 % ----------------------------------------------- OFFLINE CALIBRATION
 \begin{frame}{Offline: certify a price from a small labeled sample}
-  \textbf{Idea.} The cost $C_T(\lambda)$ is known from proxies; only the error
-  $L_T(\lambda)$ needs true labels. Estimate it on a calibration set.
+  \small
+  \textbf{Fixed-price rule.} If true losses were known, then once
+  \(\lambda\) is fixed, the decision separates across items:
+  \[
+      a_t^\lambda
+      =
+      \argmin_{a\in\calA}
+      \{c_t(a)+\lambda h_t(a)\}.
+  \]
   \begin{itemize}
-    \item Sample $m$ items, get expert labels, form empirical loss
-          $\hatL_m(\lambda)$.
-    \item Hoeffding upper confidence bound:
-          \[
-             U_m(\lambda;\alpha)=\hatL_m(\lambda)+\sqrt{\tfrac{\log(1/\alpha)}{2m}}.
-          \]
-    \item Pick the \textbf{cheapest certified price}:
-          \[
-             \hat\lambda=\min\{\lambda\ge0:\;U_m(\lambda;\alpha)\le\eps\}.
-          \]
+    \item But accessing \(h_t(a)\) requires the true label \(Y_t\).
+    \item So we form a plug-in policy family using fixed proxy losses:
+      \[
+          a_t^\lambda
+          =
+          \argmin_{a\in\calA}
+          \{c_t(a)+\lambda \hath_t(a)\}.
+      \]
+    \item The remaining question is how to choose \(\lambda\).
   \end{itemize}
-  \begin{block}{Why no union bound over $\lambda$?}
-    As $\lambda$ grows, items only move \emph{AI $\to$ expert}. So
-    $L_T(\lambda)$ is \textbf{monotone} --- a single nested family, certified for free.
+  \begin{block}{Calibration idea}
+    Label a small random subset from the whole pool and choose
+    \(\hat\lambda\) to minimize cost while keeping error \(\le\eps\) with high
+    probability.
+  \end{block}
+\end{frame}
+
+% ----------------------------------------------- OFFLINE CALIBRATION
+\begin{frame}{Offline: compute the certified price}
+  \small
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \begin{enumerate}
+    \item Draw calibration indices \(I_1,\ldots,I_m\) from the full pool and
+          query their labels.
+    \item Estimate the error of every candidate price:
+      \[
+          \hatL_m(\lambda)=\frac1m\sum_{s=1}^m h_{I_s}(a_{I_s}^\lambda),
+          \qquad
+          U_m(\lambda;\alpha)=
+          \hatL_m(\lambda)+\sqrt{\frac{\log(1/\alpha)}{2m}}.
+      \]
+    \item Choose the first price whose upper bound is below the target:
+      \[
+          \hat\lambda
+          =
+          \min\{\lambda\ge0:\; U_m(\lambda;\alpha)\le\eps\}.
+      \]
+  \end{enumerate}
+  \vspace{-1mm}
+  \begin{block}{Why this is enough}
+    In the equal-cost rule, increasing \(\lambda\) only moves items
+    \emph{AI \(\to\) expert}, so the policies are nested and
+    \(L_T(\lambda)\) is monotone. The next slide states the resulting PAC
+    guarantee for the released labels.
   \end{block}
 \end{frame}
 
@@ -42,8 +80,6 @@
   \begin{itemize}
     \item Distribution-free, finite-sample. Falls back to expert-only if no
           finite price qualifies.
-    \item \textbf{Corollary:} on a fresh deployment pool of size $n$, error
-          $\le \eps+\sqrt{\log(1/\delta)/2n}$ w.p.\ $1-\alpha-\delta$.
     \item Proxies affect \emph{cost}, not \emph{validity}: a bad proxy just
           defers more often.
   \end{itemize}
@@ -51,65 +87,113 @@
 
 % ------------------------------------------------ OFFLINE EXPERIMENT 1
 \begin{frame}{Offline experiments: LP rule matches original PAC}
-  \begin{columns}[T]
-    \begin{column}{0.52\textwidth}
-      \centering
-      \includegraphics[width=\linewidth]{simple_offline_pac_summary.png}
-      {\scriptsize One cheap source, ImageNet / ImageNetV2.}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \small
-      \textbf{One source} ($\eps=0.10$):
-      \begin{table}\centering\scriptsize
-      \begin{tabular}{llcc}
-        \toprule
-        Data & Method & Error & Saved \\
-        \midrule
-        IN   & LP    & 0.087 & 0.785 \\
-        IN   & PAC   & 0.088 & 0.786 \\
-        INv2 & LP    & 0.072 & 0.546 \\
-        INv2 & PAC   & 0.073 & 0.548 \\
-        \bottomrule
-      \end{tabular}
-      \end{table}
-      \medskip
-      \begin{itemize}
-        \item Error stays under target $\eps$ (0 violations).
-        \item LP fixed-price $\approx$ original PAC, as predicted.
-        \item Saves $\sim$78\% of expert budget on ImageNet.
-      \end{itemize}
-    \end{column}
-  \end{columns}
+  \small
+  \textbf{One cheap source} (\(\eps=0.10\)):
+  \begin{table}
+  \centering
+  \begin{tabular}{llcc}
+    \toprule
+    Dataset & Method & Error & Budget saved \\
+    \midrule
+    ImageNet   & LP fixed price & 0.087 & 0.785 \\
+    ImageNet   & Original PAC   & 0.088 & 0.786 \\
+    ImageNetV2 & LP fixed price & 0.072 & 0.546 \\
+    ImageNetV2 & Original PAC   & 0.073 & 0.548 \\
+    \bottomrule
+  \end{tabular}
+  \end{table}
+  \begin{itemize}
+    \item Error stays under target \(\eps\) in all reported runs.
+    \item With one cheap source, the LP fixed-price rule recovers the original
+          PAC threshold behavior.
+    \item On ImageNet, both methods save about \(78\%\) of expert budget.
+  \end{itemize}
 \end{frame}
 
 % ------------------------------------------------ OFFLINE EXPERIMENT 2
 \begin{frame}{Offline experiments: routing beats single sources}
-  \begin{columns}[T]
-    \begin{column}{0.52\textwidth}
-      \centering
-      \includegraphics[width=\linewidth]{two_source_offline_pac_summary.png}
-      {\scriptsize Two complementary cheap sources (by class parity).}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \small
-      \textbf{Two sources} ($\eps=0.10$, ImageNet):
-      \begin{table}\centering\scriptsize
-      \begin{tabular}{lcc}
-        \toprule
-        Method & Error & Saved \\
-        \midrule
-        LP routing        & 0.087 & \textbf{0.785} \\
-        Best-of-singles   & 0.088 & 0.475 \\
-        \bottomrule
+  \small
+  \textbf{Two cheap sources} (\(\eps=0.10\)):
+  \vspace{-1mm}
+  \begin{center}
+  \scriptsize
+  \begin{tabular}{llcc}
+    \toprule
+    Dataset & Method & Error & Budget saved \\
+    \midrule
+    ImageNet   & LP routing          & 0.087 & \textbf{0.785} \\
+    ImageNet   & Best single source  & 0.088 & 0.475 \\
+    ImageNetV2 & LP routing          & 0.072 & \textbf{0.546} \\
+    ImageNetV2 & Best single source  & 0.072 & 0.359 \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \vspace{-2mm}
+  \begin{center}
+  \begin{tikzpicture}[
+      scale=0.9,
+      transform shape,
+      font=\tiny,
+      >=Latex,
+      every node/.style={font=\tiny},
+      card/.style={draw=accent!55, line width=0.6pt, rounded corners=3pt,
+                   fill=accent!4, align=center, inner sep=0pt},
+      title/.style={fill=accent, text=white, font=\tiny\bfseries,
+                    rounded corners=2pt, inner xsep=5pt, inner ysep=2pt},
+      arrow/.style={-{Latex[length=1.8mm,width=1.6mm]}, line width=0.9pt,
+                    draw=accent!75},
+      ev/.style={text=evenc, font=\tiny\bfseries},
+      od/.style={text=oddc,  font=\tiny\bfseries}
+    ]
+    % ---- ORIGINAL SINGLE SOURCE --------------------------------------
+    \node[card, minimum width=3.7cm] (single) at (0,0) {
+      \setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.15}%
+      \begin{tabular}{@{}lll@{}}
+        {\color{accent!60!black}Group} & {\color{accent!60!black}Label} &
+          {\color{accent!60!black}Confidence} \\[0.3mm]
+        \arrayrulecolor{accent!30}\hline\\[-2.2mm]
+        {\color{evenc}\textbf{Even}} & \kept{orig.\ \(\hatY_t\)} & \confhi\,orig. \\
+        {\color{oddc}\textbf{Odd}}   & \kept{orig.\ \(\hatY_t\)} & \confhi\,orig.
       \end{tabular}
-      \end{table}
-      \medskip
-      \begin{itemize}
-        \item Per-item routing to the lower-proxy source.
-        \item Same error control, but \textbf{much} larger budget savings
-              (0.78 vs 0.47).
-        \item This is where the LP view earns its keep.
-      \end{itemize}
-    \end{column}
-  \end{columns}
+    };
+    \node[title, anchor=south] at (single.north) {Original single source};
+
+    % ---- SOURCE A -----------------------------------------------------
+    \node[card, minimum width=3.7cm] (sourceA) at (6.0,1.15) {
+      \setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.15}%
+      \begin{tabular}{@{}lll@{}}
+        {\color{accent!60!black}Group} & {\color{accent!60!black}Label} &
+          {\color{accent!60!black}Confidence} \\[0.3mm]
+        \arrayrulecolor{accent!30}\hline\\[-2.2mm]
+        {\color{evenc}\textbf{Even}} & \kept{orig.\ \(\hatY_t\)} & \confhi\,orig. \\
+        {\color{oddc}\textbf{Odd}}   & \rand{random}            & \conflo\,low
+      \end{tabular}
+    };
+    \node[title, anchor=south] at (sourceA.north) {Source A \;\textcolor{white!55}{$\vert$}\; keeps \textcolor{evenc!30!white}{Even}};
+
+    % ---- SOURCE B -----------------------------------------------------
+    \node[card, minimum width=3.7cm] (sourceB) at (6.0,-1.15) {
+      \setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.15}%
+      \begin{tabular}{@{}lll@{}}
+        {\color{accent!60!black}Group} & {\color{accent!60!black}Label} &
+          {\color{accent!60!black}Confidence} \\[0.3mm]
+        \arrayrulecolor{accent!30}\hline\\[-2.2mm]
+        {\color{evenc}\textbf{Even}} & \rand{random}            & \conflo\,low \\
+        {\color{oddc}\textbf{Odd}}   & \kept{orig.\ \(\hatY_t\)} & \confhi\,orig.
+      \end{tabular}
+    };
+    \node[title, anchor=south] at (sourceB.north) {Source B \;\textcolor{white!55}{$\vert$}\; keeps \textcolor{oddc!55!white}{Odd}};
+
+    % ---- branching arrows --------------------------------------------
+    \draw[arrow] (single.east) to[out=15,in=180]  (sourceA.west);
+    \draw[arrow] (single.east) to[out=-15,in=180] (sourceB.west);
+    \node[fill=accent!10, draw=accent!40, rounded corners=2pt,
+          inner sep=2.5pt, font=\tiny\itshape] at (3.05,0)
+      {split by true-class parity};
+	  \end{tikzpicture}
+	  \vspace{-1mm}
+
+	  {\tiny \(\textnormal{random}\sim\mathrm{Uniform}(0,1)\), \quad
+	  \(\textnormal{low confidence}\sim\mathrm{Uniform}(0,0.2)\).}
+	  \end{center}
 \end{frame}

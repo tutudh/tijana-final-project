@@ -30,8 +30,9 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{xcolor}
+\usepackage{colortbl}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta}
+\usetikzlibrary{arrows.meta,positioning,backgrounds}
 
 % ---- math shortcuts (mirrors the report) ----------------------------
 \newcommand{\R}{\mathbb{R}}
@@ -47,6 +48,14 @@
 \newcommand{\argmin}{\operatorname*{arg\,min}}
 
 \definecolor{accent}{RGB}{30,90,160}
+\definecolor{evenc}{RGB}{30,110,170}   % Even-parity hue (blue)
+\definecolor{oddc}{RGB}{205,120,30}    % Odd-parity hue (amber)
+\definecolor{dropc}{RGB}{190,60,60}    % randomized / discarded (red)
+% confidence markers + label helpers for the source-split diagram
+\newcommand{\confhi}{\textcolor{accent}{$\bullet$}}     % high confidence
+\newcommand{\conflo}{\textcolor{dropc!75}{$\circ$}}     % low confidence
+\newcommand{\kept}[1]{\textcolor{black}{#1}}            % label retained
+\newcommand{\rand}[1]{\textcolor{dropc}{#1}}           % label randomized
 \setbeamercolor{frametitle}{bg=accent!18,fg=accent!130}
 \setbeamercolor{title}{fg=accent!130}
 \setbeamercolor{structure}{fg=accent}
