@@ -3,7 +3,7 @@
     We have a pool of unlabeled items $X_1,\dots,X_T$. Need to collect their true labels $Y_1,\dots,Y_T$.
     \medskip
 
-    \uncover<2->{Two ways to get a label $\tilde Y_t$:
+    \uncover<2->{Two ways to get a label $\tildeY_t$:
     \begin{itemize}
       \item \textbf{ML models} $\hatY_t^{(a)}$ --- sometimes \emph{wrong}, but \emph{cheap}
       \item \textbf{Expert} $Y_t$ --- \emph{correct}, but \emph{expensive}.
@@ -23,25 +23,22 @@
 % --------------------------------------------------------------- SETUP
 \begin{frame}{Problem setup}
   \begin{itemize}
-    \item For each item $X_t$, decide how to label it: use the \textbf{expert} or one of $k$ \textbf{cheap models}.
-    \item Choose action $a_t$ from an action set $\calA=\{E,1,\dots,k\}$.
-    \item For item $t$ and action $a$, a labeling \textbf{loss} and a \textbf{cost}:
+    {\item For each item $X_t$, decide how to label it: use the \textbf{expert} or one of \textbf{$k$ cheap models}.
+    \item Choose action $a_t$ from an action set $\calA=\{E,1,\dots,k\}$.}
+    \item Label the item with
+          $\tildeY_t = Y_t$ if $a_t=E$, else $\hatY_t^{(a_t)}$.
+    \uncover<2->{\item For item $t$ and action $a$, a labeling \textbf{loss} and a \textbf{cost}:
       \[
       h_t(a)=
       \begin{cases}0,& a=E\\[2pt] \ell(Y_t,\hatY_t^{(a)}),& a\in[k]\end{cases}
       \qquad\qquad
       c_t(a)=
       \begin{cases}1,& a=E\\[2pt] 0,& a\in[k]\end{cases}
-      \]
-    % \item Expert is correct ($h=0$) but costs $1$; cheap models are free
-    %       ($c=0$) but may err. Losses normalized to $[0,1]$.
-    \item Label the item with
-          $\tildeY_t = Y_t$ if $a_t=E$, else $\hatY_t^{(a_t)}$.
+      \]}
   \end{itemize}
   \vfill
-  \centering
-  % \footnotesize
-  \textcolor{accent}{Two goals: minimize \emph{cost}, control the labeling \emph{error}.}
+  \uncover<3->{\centering
+  \textcolor{accent}{Two goals: minimize \emph{cost}, control the labeling \emph{error}.}}
 \end{frame}
 
 % --------------------------------------------------------- SETUP DIAGRAM
@@ -97,10 +94,10 @@
   \end{aligned}
   \]
   \vfill
-  \begin{itemize}
+  \uncover<2->{\begin{itemize}
     \item Models multi-sources setting and item-specific costs.
     \item If true losses $h_t(a)$ were known, this LP is the \emph{optimal} policy.
-  \end{itemize}
+  \end{itemize}}
 \end{frame}
 
 % --------------------------------------------------------- DUAL / PRICE
@@ -110,53 +107,56 @@
      \max_{\lambda\ge0}\; -\lambda\eps
        +\frac1T\sum_{t=1}^{T}\min_{a\in\calA}\bigl\{c_t(a)+\lambda\,h_t(a)\bigr\}.
   \]
-  \begin{block}{Simple decision rule from the shadow price}
+  \uncover<2->{\begin{block}{Simple decision rule from the shadow price}
     Given a fixed-price $\lambda$, the corresponding primal decision is given by:
     \[
        a_t(\lambda)\in\argmin_{a\in\calA}\bigl\{c_t(a)+\lambda\,h_t(a)\bigr\}.
     \]
-  \end{block}
+  \end{block}}
 
   \medskip
-  \begin{itemize}
+  \uncover<3->{\begin{itemize}
     \item {Since $h_t(a)$ is unknown, we can replace it with an estimate $\hath_t(a)$.}
     \item The PAC guarantee does not require $\hath_t(a)$ to be accurate, this affects the labeling cost.
-  \end{itemize}
+  \end{itemize}}
   
 
 \end{frame}
 
 % ----------------------------------------------------- THRESHOLD FORM
 \begin{frame}{Price gives a threshold policy}
+  \[
+       a_t(\lambda)\in\argmin_{a\in\calA}\bigl\{c_t(a)+\lambda\,h_t(a)\bigr\}.
+  \]
   Since $c_t(j)=0$ and $c_t(E)=1$  for $j\in[k]$, the decision rule is equivalent to:
   \[
-     j_t^\star \in \argmin_{j\in[k]}\hath_t(j),
+     1. \qquad j_t^\star \in \argmin_{j\in[k]}\hath_t(j),
      \qquad s_t=\min_{j}\hath_t(j) \quad(\text{the least uncertainty score}).
   \]
-  \[
+  {\[ 2. \qquad
      {\;s_t \ge 1/\lambda \;\Rightarrow\; \text{defer to expert}\;}
      \qquad
      s_t < 1/\lambda \;\Rightarrow\; \text{route to model $j_t^\star$}.
-  \]
+  \]}
   \vfill
-  \begin{itemize}
-    \item Recovers the original \textbf{PAC-labeling} threshold rule
-          (single source: $\hath_t=$ uncertainty).
+  \uncover<2->{\begin{itemize}
+    \item Single source setting: recovers the original \textbf{PAC-labeling} threshold rule.
     \item Multi-source setting: use least uncertain model as the routing rule.
-  \end{itemize}
+  \end{itemize}}
 \end{frame}
 
 \begin{frame}{Overview}
-  Given a fixed-price $\lambda$, the cost-aware labeling LP gives a simple threshold policy.
+
+  {\textcolor{red}{Given a fixed-price $\lambda$}}, the cost-aware labeling LP gives a simple {\textcolor{red}{threshold policy}}.
 
 \bigskip
-  \centering{
+  \uncover<2->{\centering{
   {\textcolor{accent}{Since we use proxy $\hath$, how to select $\lambda$ such that we have PAC guarantees?}}
-  }
+  }}
 \bigskip
-  \begin{itemize}
+  \uncover<3->{\begin{itemize}
     \item \textbf{Offline} setting: fixed pool of $T$ items, estimate $\hat \lambda$ from a calibration set.
     \item \textbf{Online} setting: items arrive sequentially, we update price $\lambda_t$ onlinely.
-  \end{itemize}
+  \end{itemize}}
 
 \end{frame}
