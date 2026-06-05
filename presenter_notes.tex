@@ -52,11 +52,12 @@
 \vspace{-0.8cm}
 
 \noindent\textbf{Pacing guide.} Setup + LP (0:00--4:00), offline + results
-(4:00--11:30), online + results (11:30--14:45), takeaways (14:45--15:00).
-Slide-by-slide parenthetical times are \emph{cumulative} targets. If running
-long, compress the dual derivation (Slide 5) and the proof sketches (Slides 9,
-14) and lean on the figures --- those are the parts an audience can skip without
-losing the thread.
+(4:00--11:30), then the \emph{online segment} (Slides 12--17) as a self-contained
+$\approx$5-minute block. Parenthetical times are \emph{cumulative} through Slide
+11; for the online block they restart and are \emph{relative to the start of the
+segment} (it is a separate speaker). If running long, compress the dual
+derivation (Slide 5) and the proof sketches (Slides 9 and 15) and lean on the
+figures --- those are the parts an audience can skip without losing the thread.
 
 \noindent\textbf{The one-sentence thesis} (keep returning to it): \emph{a single
 LP dual variable $\lambda$ --- the ``price of error'' --- unifies offline
@@ -120,23 +121,6 @@ The released label is $\tildeY_t=Y_t$ when we defer, else $\hatY_t^{(a_t)}$.
 source-specific costs; we specialize to equal costs because that is what makes
 $L_T(\lambda)$ monotone and what the data supports. Unequal costs come back in
 the limitation slide and in the Q\&A.}
-
-% --------------------------------------------------------------------
-\section{Setup schematic}
-\timecue{3:20}
-\cue{Use the picture to make the notation concrete.} For one data point $X_t$,
-there are $k+1$ possible actions: send it to the expert, or accept one of the
-$k$ model predictions. The table is just the definition in visual form. The
-expert row has loss $0$ and cost $1$. Each model row has cost $0$ and loss
-$\ell(Y_t,\hatY_t^{(j)})$, which is unknown until we see the true label.
-
-\cue{Connect back to the LP.} The whole LP is made by repeating this little
-choice table for every item $t=1,\dots,T$, then imposing one global average-error
-constraint across all those itemwise choices.
-
-\backup{This slide is also a good place to remind the audience that the expert
-is not another noisy model: in the setup it reveals the true label $Y_t$. The
-models are cheap alternatives whose loss is measured against $Y_t$.}
 
 % --------------------------------------------------------------------
 \section{The cost-aware LP}
@@ -331,80 +315,114 @@ $m=0.2T$, $\alpha=0.05$.}
 
 % --------------------------------------------------------------------
 \section{Part II divider --- Online}
-\timecue{11:45}
+\timecue{0:10 (segment-relative)}
 \cue{One sentence.} ``Now items stream in one at a time, and an AI label's true
 error is invisible unless we pay to audit it --- so we can no longer certify a
-fixed price up front; the price has to \emph{move}.''
+fixed price up front; the price has to \emph{move}.'' This begins your
+$\approx$5-minute segment; the times below are relative to here.
 
 % --------------------------------------------------------------------
-\section{Online setup + audited feedback}
-\timecue{13:00}
-\cue{Describe the loop concretely.} At round $t$ we see $X_t$, the cheap labels,
-and \emph{predictable} proxies $\hath_t(j)$. Route to the lowest-proxy model,
-then threshold with the \emph{current} price: defer iff
-$\lambda_t\hath_t^\lambda\ge1$, i.e.\ $\hath_t^\lambda\ge1/\lambda_t$. If we keep
-the AI label we \textbf{audit} it with probability $p_t\in[p_{\min},1]$ ---
-$A_t\sim\text{Bernoulli}(p_t)$, drawn \emph{before} we see the label. If audited,
-we query the expert, \emph{correct} the released label to $Y_t$, and observe the
-AI's counterfactual error.
+\section{Online setup: moving threshold + audits}
+\timecue{0:55}
+\cue{The obstacle first.} The new difficulty versus offline: once we release an
+AI label we normally \emph{never learn} whether it was right --- the loss
+$\ell(Y_t,\hatY_t)$ is hidden unless we pay the expert. So we cannot just read
+off our running error rate; we have to buy information.
 
-\cue{The one technical idea: inverse-probability weighting.} Audits are rare, so
-to keep the update unbiased we up-weight an observed AI error by $1/p_t$. Writing
-the observation mask $O_t=D_t+(1-D_t)A_t$ and its probability
-$q_t=D_t+(1-D_t)p_t$, the centered signal is
-$\widehat Z_t=\frac{O_t}{q_t}(H_t-\eps_0)$, and
-$\E[\widehat Z_t\mid\calG_t]=H_t-\eps_0$ --- \emph{unbiased} for the true AI loss
-minus an internal target $\eps_0$, despite seeing labels only intermittently.
-That unbiasedness is the linchpin of the whole online guarantee.
+\cue{Describe the loop concretely.} Each round hold a current price $\lambda_t$,
+i.e.\ a threshold $1/\lambda_t$ on the routed uncertainty score
+$s_t=\min_j\hath_t(j)$. Route to the lowest-proxy model; if it is too uncertain
+($s_t\ge1/\lambda_t$) defer to the expert (always correct). Otherwise release the
+AI label, then flip a coin: with probability $p$ \emph{audit} it --- pay the
+expert, \emph{correct} the released label, and \emph{observe the AI's true loss}
+$\ell_t$. Audits are rare on purpose, to stay cheap; that observed $\ell_t$ is
+the only feedback, and it drives the next slide's update.
 
-\backup{Three concrete cases for $\widehat Z_t$: $-\eps_0$ on a deferral
-(expert used, $H_t=0$); $(\ell_t-\eps_0)/p_t$ on an audited AI label; $0$ on an
-unaudited AI label. Predictability (Assumption 1) means routing, $p_t$, and the
-selected source use only past + current non-expert information; given that
-pre-audit $\sigma$-field $\calG_t$, $A_t$ is independent Bernoulli$(p_t)$. The
-unbiasedness is Proposition 1: $\E[O_t/q_t\mid\calG_t]=1$ in both the deferral
-($1/1$) and AI ($p_t/p_t$) cases.}
+\backup{Predictability (Assumption~1): routing, the audit probability, and the
+selected source use only past information plus the current non-expert info
+$(X_t,\{\hatY_t^{(j)},\hath_t(j)\})$; given that, the audit draw
+$A_t\sim\text{Bernoulli}(p_t)$ is independent, with $p_t\in[p_{\min},1]$ (in the
+experiments $p_t\equiv p$ is constant). The proxy is also floored,
+$\hath_t(j)\in[\rho,1]$ --- that floor is what bounds the price on Slide~15.}
 
 % --------------------------------------------------------------------
-\section{Online update + guarantee}
-\timecue{14:15}
+\section{The price update}
+\timecue{2:10}
 \cue{The update is one-line dual ascent.}
-$\lambda_{t+1}=[\lambda_t+\eta\widehat Z_t]_+$. Narrate the sign of the feedback:
-an audited \emph{mistake} raises $\lambda$, which lowers the threshold
-$1/\lambda$ and makes future routing more cautious; a deferral or a clean audit
-lowers $\lambda$ and trusts the AI more. The internal target $\eps_0\le\eps$
-deliberately leaves slack for the finite-horizon term.
+$\lambda_{t+1}=[\lambda_t+\eta\widehat Z_t]_+$, projected to stay $\ge0$, where
+$\widehat Z_t$ is this round's feedback. Three cases: $-\eps$ on a deferral;
+$(\ell_t-\eps)/p$ on an audited AI label; $0$ on an unaudited AI label.
 
-\cue{The theorem, in words.} For \emph{any} data sequence (distribution-free;
-the only randomness is the audits), with probability $\ge1-\delta$ the realized
-final error is
+\cue{Narrate the sign.} An audited loss \emph{above} target ($\ell_t>\eps$) makes
+$\widehat Z_t>0$, so $\lambda$ rises, the threshold $1/\lambda$ falls, and future
+routing gets more cautious; a deferral or a clean audit ($\ell_t<\eps$) lowers
+$\lambda$ and leans on the AI more.
+
+\cue{Why the $1/p$ --- the key idea.} Audits are rare, so each audited item must
+stand in for the $\sim\!1/p$ unaudited ones: inverse-probability weighting. That
+makes the update \emph{unbiased} --- in expectation it behaves as if every AI
+loss were seen, $\E[\widehat Z_t\mid\text{past}]=(\text{AI error})-\eps$.
+\cue{Flag the simplification:} the update now centers \emph{directly} on the
+final target $\eps$; there is no separate internal target $\eps_0$ any more (the
+report dropped it). The only gap to $\eps$ is the vanishing slack on the next
+slide.
+
+\backup{In the proof's notation the three cases compress to the centered
+inverse-observation signal $\widehat Z_t=\frac{O_t}{q_t}(H_t-\eps)$, with mask
+$O_t=D_t+(1-D_t)A_t$ and $q_t=D_t+(1-D_t)p_t$ ($q_t=1$ on a deferral, $p_t$ on an
+AI decision). Proposition~1: $\E[O_t/q_t\mid\calG_t]=1$ in both cases ($1/1$ and
+$p_t/p_t$), hence $\E[\widehat Z_t\mid\calG_t]=H_t-\eps$. Keep $O_t,q_t,\calG_t$
+off the slides --- they are bookkeeping for the martingale step only.}
+
+% --------------------------------------------------------------------
+\section{Finite-horizon guarantee: anatomy of the bound}
+\timecue{3:35}
+\cue{State the result.} For \emph{any} data sequence --- no distributional
+assumptions, the only randomness is the audit coins --- with probability
+$\ge1-\delta$,
 \[
-   \tfrac1T\sum_t G_t\;\le\;\tfrac1T\sum_t H_t\;\le\;
-   \eps_0+\frac{\Lambda_{\mathrm{on}}}{\eta T}
-   +\frac{1}{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}.
+   \tfrac1T\sum_t\ell(Y_t,\tildeY_t)\;\le\;\eps+B_T,
+   \qquad
+   B_T=\frac{\Lambda_{\mathrm{on}}}{\eta T}
+       +\frac{1}{p_{\min}}\sqrt{\frac{2\log(1/\delta)}{T}}.
 \]
-The first extra term is optimization error (how fast dual ascent moves), the
-second is concentration from intermittent feedback. Both vanish as $T\to\infty$.
-\cue{The tuning corollary:} choose $\eps_0=\eps-B_T$ where $B_T$ is the slack;
-with $\eta\asymp T^{-1/2}$ and constant $p_{\min}$, $B_T=O(T^{-1/2})$, so final
-error $\le\eps$. Note this controls \emph{realized error}, not regret against an
-offline oracle.
+It controls \emph{realized} error, not regret against an offline oracle.
+
+\cue{Read the bound term by term --- this is the slide's whole job.} (1) $\eps$
+is the target the update steers toward. (2) $\Lambda_{\mathrm{on}}/(\eta T)$ is
+optimization error --- how far the price can wander before it settles --- decaying
+like $1/T$. (3) the last term is the \emph{price of partial feedback}: sampling
+noise from auditing only a fraction, scaling like $1/\sqrt T$ and inflating as
+the audit floor $p_{\min}$ shrinks.
+
+\cue{Define $\Lambda_{\mathrm{on}}$ and give the intuition} (the new piece on the
+slide). Explicitly $\Lambda_{\mathrm{on}}=\max\{\lambda_1,\,
+1/\rho+\eta(1-\eps)/p_{\min}\}$ --- a constant ceiling the price can never exceed.
+\emph{Why} it can't run away: the proxy is floored at $\rho$, so the moment
+$\lambda_t$ reaches $1/\rho$ the threshold $1/\lambda_t$ drops to $\rho$ or below;
+then \emph{every} item looks too uncertain and defers, which only pushes the
+price back down. A single update can overshoot that level by at most one step
+$\eta(1-\eps)/p_{\min}$ --- hence the formula. It is self-limiting.
+
+\cue{The slack vanishes.} $B_T=O(T^{-1/2})$, so the released error approaches
+$\eps$ as the stream grows; with $\eta\asymp T^{-1/2}$ that rate is explicit.
+\cue{Released vs.\ AI error:} the bound is really on the counterfactual AI error,
+but every audited mistake is corrected before release, so the shipped error is
+only smaller.
 
 \backup{Proof sketch (only if asked): (i) the price is bounded,
-$0\le\lambda_t\le\Lambda_{\mathrm{on}}$ --- once $\lambda_t\ge1/\rho$ the proxy
-floor $\hath_t\ge\rho$ forces $\lambda_t\hath_t\ge1$, i.e.\ a deferral, which can
-only pull $\lambda$ back down. (ii) Since $[x]_+\ge x$, telescoping gives
-$\sum_t\widehat Z_t\le\Lambda_{\mathrm{on}}/\eta$. (iii) The gap
-$M_t=(H_t-\eps_0)-\widehat Z_t$ is a martingale-difference sequence (by Prop.\ 1)
-bounded by $1/p_{\min}$, so Azuma--Hoeffding controls $\sum_t M_t$. (iv) Combine
-via $\sum_t H_t=T\eps_0+\sum_t\widehat Z_t+\sum_t M_t$, and use
-audit-and-correct's pointwise $G_t\le H_t$. Two assumptions:
-\emph{predictable routing + random audits}, and a \emph{proxy floor}
-$\hath_t(j)\in[\rho,1]$.}
+$0\le\lambda_t\le\Lambda_{\mathrm{on}}$, by the deferral argument above. (ii)
+Since $[x]_+\ge x$, telescoping gives $\sum_t\widehat
+Z_t\le\Lambda_{\mathrm{on}}/\eta$. (iii) The gap $M_t=(H_t-\eps)-\widehat Z_t$ is
+a martingale-difference sequence (Prop.\ 1) bounded by $1/p_{\min}$, so
+Azuma--Hoeffding gives $\sum_t M_t\le\frac{1}{p_{\min}}\sqrt{2T\log(1/\delta)}$.
+(iv) Combine via $\sum_t H_t=T\eps+\sum_t\widehat Z_t+\sum_t M_t$, then use
+audit-and-correct's pointwise $G_t\le H_t$ to pass from AI error to released
+error.}
 
 % --------------------------------------------------------------------
 \section{Online experiment}
-\timecue{14:45}
+\timecue{4:20}
 \cue{One clean message: $p$ is a validity--cost knob.} Per trial we randomly
 permute the pool into a stream; settings $\eta=1$, proxy floor $\rho=0.01$,
 $\lambda_1=1/\eps$, audit rate $p\in\{0.1,0.2,0.5\}$, again 500 trials. At
@@ -420,17 +438,16 @@ The gap between them is literally the value of auditing. The released-label erro
 stays controlled even under heavily partial feedback --- the online guarantee in
 action.
 
-\backup{These runs set $\eps_0=\eps$ rather than subtracting the
-finite-horizon slack $B_T$ of the tuning corollary. That is why a couple of tiny
-violations appear (e.g.\ ImageNetV2, $\eps=0.05$, $p=0.1$: violation $0.184$):
-without the slack the bound is exactly $\eps$, so finite-$T$ fluctuation can
-nudge over. Subtracting $B_T$ would remove them at a small cost in savings. The
-``AI error'' column is the pre-correction counterfactual; ``final error'' is
+\backup{Because the update centers on $\eps$ directly (no $\eps_0$ slack is
+subtracted), the bound sits at exactly $\eps+B_T$, so at small $\eps$ and small
+$p$ finite-$T$ fluctuation can produce a tiny violation (e.g.\ ImageNetV2,
+$\eps=0.05$, $p=0.1$: violation $0.184$); it shrinks as $T$ grows or $p$ rises.
+The ``AI error'' column is the pre-correction counterfactual; ``final error'' is
 post-correction.}
 
 % --------------------------------------------------------------------
 \section{Takeaways}
-\timecue{15:00}
+\timecue{4:45}
 \cue{Close on the unifying idea.} One LP dual gives a single price of error.
 Offline we \emph{certify} it on held-out labels (Hoeffding + monotonicity);
 online we \emph{move} it with audited inverse-probability feedback (dual ascent +
@@ -500,14 +517,17 @@ one pointwise Hoeffding bound suffices. The moment costs are unequal, source
 selection depends on $\lambda$, monotonicity breaks, and you \emph{do} pay a
 union bound over a price grid (or over the $\le1+(T+m)\binom{k+1}{2}$ breakpoints).
 
-\qsection{Q6. What exactly is $\eps_0$, and why does the online error sometimes exceed $\eps$?}
-$\eps_0\le\eps$ is an \emph{internal} target the price update aims at; the gap
-$\eps-\eps_0$ is reserved to absorb the finite-horizon slack $B_T$ (optimization +
-concentration terms). The theory says: set $\eps_0=\eps-B_T$ and you get final
-error $\le\eps$ with probability $1-\delta$. In the experiments we set
-$\eps_0=\eps$ for simplicity --- i.e.\ we spent the slack --- so the guarantee is
-exactly at the boundary and finite-$T$ noise produces a couple of tiny
-violations. Re-introducing the slack removes them.
+\qsection{Q6. Why does the online error sometimes exceed $\eps$?}
+The guarantee is $\frac1T\sum_t\ell(Y_t,\tildeY_t)\le\eps+B_T$, with
+$B_T=\Lambda_{\mathrm{on}}/(\eta T)+\tfrac1{p_{\min}}\sqrt{2\log(1/\delta)/T}$.
+The price update centers on $\eps$ \emph{directly}, so the bound sits exactly at
+$\eps+B_T$, not at $\eps$: there is a finite-horizon cushion $B_T$ that the
+target is allowed to overshoot by. At small $\eps$ and small $p$ (few audits,
+larger $B_T$) finite-$T$ noise can push the realized error a little above $\eps$
+--- e.g.\ ImageNetV2, $\eps=0.05$, $p=0.1$. Since $B_T=O(T^{-1/2})$, the cushion
+shrinks as the stream lengthens or the audit rate rises, and the error settles
+back to $\eps$. (An earlier draft carried a separate internal target $\eps_0$ and
+``spent'' this slack explicitly; the current version folds it into $B_T$.)
 
 \qsection{Q7. How do you choose the audit rate $p$ (and the step size $\eta$)?}
 $p$ is a deliberate cost/validity dial: small $p$ saves budget but gives noisier
@@ -518,7 +538,19 @@ $\Lambda_{\mathrm{on}}/(\eta T)+O(1/\sqrt T)$, optimized at
 $\eta\asymp T^{-1/2}$, which makes the whole slack $O(T^{-1/2})$. In the runs we
 used a fixed $\eta=1$ and still saw control because $T$ is large.
 
-\qsection{Q8. Is this regret or error control? How does it relate to online conformal prediction?}
+\qsection{Q8. If the dashed counterfactual AI-error curve already satisfies the error bound, are audits actually needed?}
+The dashed curve is not ``use AI on every item.'' It is the error of the
+\emph{selected} AI labels after the deferral rule has already removed
+high-proxy-loss items: $H_t=(1-D_t)\ell(Y_t,\hat Y_t)$. So the fact that it is
+below $\eps$ says the confidence proxy and threshold/router are working well in
+this dataset. It does \emph{not} mean the online learner could certify or adapt
+without labels. Audits provide the feedback for updating $\lambda_t$ and protect
+against miscalibration or stream shift; without audits, AI-label losses are
+hidden and a bad threshold could silently violate the target. The right takeaway
+is that a strong proxy may reduce the number of audits needed, not that audits
+are unnecessary.
+
+\qsection{Q9. Is this regret or error control? How does it relate to online conformal prediction?}
 It's \emph{realized-error} control over a fixed horizon, not regret against an
 offline expert-query oracle. The lineage is online/adaptive conformal prediction
 with partial (semi-bandit) feedback --- those methods update a calibration
@@ -528,7 +560,7 @@ inverse-probability signal $O_t/q_t$ is exactly that correction. The object we
 control is the average error of the \emph{released dataset}, not prediction-set
 coverage.
 
-\qsection{Q9. What's the actual cost of calibration / auditing --- isn't that hidden expert spend?}
+\qsection{Q10. What's the actual cost of calibration / auditing --- isn't that hidden expert spend?}
 Good --- we separate three costs in the report. \emph{Deployment} cost is
 $C_T(\lambda)$, the quantity we minimize. \emph{Development} cost is the expert
 labels used to train the proxy and to certify the price ($m=0.2T$ here); if those
@@ -538,7 +570,7 @@ $\E[C_t\mid\calG_t]=D_t+(1-D_t)p_t$ per round --- the extra expert spend to obta
 feedback. So the headline ``78\% saved'' is deployment savings; calibration is a
 one-time, accountable overhead.
 
-\qsection{Q10. Does the guarantee need i.i.d.\ data?}
+\qsection{Q11. Does the guarantee need i.i.d.\ data?}
 The offline pool guarantee is \emph{conditional on the fixed pool} --- it only
 needs the calibration indices to be sampled i.i.d.\ from the pool, not the data
 to be i.i.d.\ The \emph{generalization} corollary (population risk + fresh
@@ -547,7 +579,7 @@ is fully \emph{distribution-free in the data sequence} --- it can even be
 adversarial --- with all randomness coming from the audit coin flips. That
 robustness is one of the nicer features of the online side.
 
-\qsection{Q11. Why is ImageNetV2 harder (lower savings, occasional violation)?}
+\qsection{Q12. Why is ImageNetV2 harder (lower savings, occasional violation)?}
 ImageNetV2 is a known distribution shift from ImageNet --- the base model is less
 accurate and less calibrated on it, so at the same $\eps$ fewer items clear the
 confidence threshold and we defer more (savings drop from $\sim$0.78 to
