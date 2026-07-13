@@ -2,8 +2,9 @@
 %  Online PAC Labeling from a Linear Programming Perspective
 %  Presentation slides (Beamer)
 %
-%  Compile with:  pdflatex slides.tex   (run twice)
-%  Companion file: presenter_notes.tex
+%  Compile from the repository root with:
+%    latexmk -cd -pdf -interaction=nonstopmode -halt-on-error slides/slides.tex
+%  Companion file: slides/presenter_notes.tex
 % =====================================================================
 \documentclass[aspectratio=169,11pt]{beamer}
 
@@ -61,9 +62,9 @@
 \setbeamercolor{structure}{fg=accent}
 
 % ---- figure path ----------------------------------------------------
-\graphicspath{{experiments/results/simple_offline_pac/}
-              {experiments/results/two_source_offline_pac/}
-              {experiments/results/simple_online_pac/}}
+\graphicspath{{../experiments/results/simple_offline_pac/}
+              {../experiments/results/two_source_offline_pac/}
+              {../experiments/results/simple_online_pac/}}
 
 % =====================================================================
 \title[Online PAC Labeling via LP]{Online PAC Labeling \\ from a Linear Programming Perspective}

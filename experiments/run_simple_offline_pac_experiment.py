@@ -11,9 +11,12 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-DEFAULT_DATASETS = {
-    "ImageNet": "HW4_副本/imagenet.csv",
-    "ImageNetV2": "HW4_副本/imagenetv2.csv",
+EXPERIMENTS_DIR = Path(__file__).resolve().parent
+DEFAULT_DATA_DIR = EXPERIMENTS_DIR / "data"
+DEFAULT_OUTPUT_DIR = EXPERIMENTS_DIR / "results" / "simple_offline_pac"
+DATASET_FILENAMES = {
+    "ImageNet": "imagenet.csv",
+    "ImageNetV2": "imagenetv2.csv",
 }
 
 
@@ -233,6 +236,11 @@ def make_plot(summary, out_path):
 def run(args):
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    data_dir = Path(args.data_dir)
+    datasets = {
+        name: data_dir / filename
+        for name, filename in DATASET_FILENAMES.items()
+    }
 
     thresholds = np.concatenate(
         [[-np.inf], np.linspace(0.0, 1.0, args.num_thresholds)]
@@ -240,8 +248,8 @@ def run(args):
     rng = np.random.default_rng(args.seed)
 
     trial_rows = []
-    for dataset, rel_path in DEFAULT_DATASETS.items():
-        scores, mistakes = load_dataset(Path(rel_path))
+    for dataset, path in datasets.items():
+        scores, mistakes = load_dataset(path)
         n = len(scores)
         model_error = float(mistakes.mean())
         full_losses, full_saved = evaluate_grid(scores, mistakes, thresholds)
@@ -322,8 +330,15 @@ def parse_args():
         default=[0.05, 0.10, 0.15],
     )
     parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=DEFAULT_DATA_DIR,
+        help="Directory containing imagenet.csv and imagenetv2.csv.",
+    )
+    parser.add_argument(
         "--output-dir",
-        default="results/simple_offline_pac",
+        type=Path,
+        default=DEFAULT_OUTPUT_DIR,
     )
     return parser.parse_args()
 

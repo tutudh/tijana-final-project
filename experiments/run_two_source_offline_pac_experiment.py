@@ -37,7 +37,7 @@ Methods compared:
 
 The script is deliberately additive: it does not import from, modify, or
 overwrite any existing file under this repository. Outputs go to a new
-directory ``results/two_source_offline_pac/``.
+directory ``experiments/results/two_source_offline_pac/``.
 """
 
 import argparse
@@ -53,9 +53,12 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-DEFAULT_DATASETS = {
-    "ImageNet": "data/imagenet.csv",
-    "ImageNetV2": "data/imagenetv2.csv",
+EXPERIMENTS_DIR = Path(__file__).resolve().parent
+DEFAULT_DATA_DIR = EXPERIMENTS_DIR / "data"
+DEFAULT_OUTPUT_DIR = EXPERIMENTS_DIR / "results" / "two_source_offline_pac"
+DATASET_FILENAMES = {
+    "ImageNet": "imagenet.csv",
+    "ImageNetV2": "imagenetv2.csv",
 }
 
 
@@ -320,6 +323,11 @@ def make_plot(summary, out_path):
 def run(args):
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    data_dir = Path(args.data_dir)
+    datasets = {
+        name: data_dir / filename
+        for name, filename in DATASET_FILENAMES.items()
+    }
 
     thresholds = np.concatenate(
         [[-np.inf], np.linspace(0.0, 1.0, args.num_thresholds)]
@@ -328,8 +336,8 @@ def run(args):
 
     synth_records = []
     trial_rows = []
-    for dataset, rel_path in DEFAULT_DATASETS.items():
-        y, yhat, conf = load_dataset(Path(rel_path))
+    for dataset, path in datasets.items():
+        y, yhat, conf = load_dataset(path)
         proxy_A, proxy_B, mistakes_A, mistakes_B = synthesize_two_sources(
             y, yhat, conf, seed=args.synth_seed, low_conf_max=args.low_conf_max,
         )
@@ -433,7 +441,15 @@ def parse_args():
         "--epsilons", type=float, nargs="+", default=[0.05, 0.10, 0.15],
     )
     parser.add_argument(
-        "--output-dir", default="experiments/results/two_source_offline_pac",
+        "--data-dir",
+        type=Path,
+        default=DEFAULT_DATA_DIR,
+        help="Directory containing imagenet.csv and imagenetv2.csv.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=DEFAULT_OUTPUT_DIR,
     )
     return parser.parse_args()
 
