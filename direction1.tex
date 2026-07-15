@@ -1,0 +1,988 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.45\baselineskip}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\newtheorem{lemma}{Lemma}
+\newtheorem{assumption}{Assumption}
+\newtheorem{remark}{Remark}
+\newtheorem{definition}{Definition}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Pp}{\mathbb{P}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\ind}[1]{\mathbf{1}\{#1\}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\simplex}{\Delta_K}
+\newcommand{\calF}{\mathcal{F}}
+\newcommand{\calG}{\mathcal{G}}
+\newcommand{\calL}{\mathcal{L}}
+\newcommand{\what}{\widehat w}
+\newcommand{\hvec}{\boldsymbol h}
+\newcommand{\cvec}{\boldsymbol c}
+\newcommand{\one}{\boldsymbol 1}
+\newcommand{\argmin}{\operatorname*{arg\,min}}
+\newcommand{\argmax}{\operatorname*{arg\,max}}
+\DeclareMathOperator{\Ber}{Bernoulli}
+
+\title{\textbf{Direction 1: Audited Primal--Dual Policy Learning}\\
+\large Simultaneous Error Control and Cost Regret}
+\author{Draft research direction for Cost-Aware PAC Labeling}
+\date{July 13, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The current audited online PAC-labeling result controls labeling error but does
+not compare expert expenditure with a cost-optimal policy.  This note develops
+a candidate conference-paper direction that adds such a comparison.  The main
+change is to maintain a distribution over a fixed finite class of threshold
+policies in addition to the dual price of error.  Expert deferrals and random
+audits provide inverse-probability estimates of every policy's counterfactual
+AI loss.  A primal exponential-weights update learns inexpensive policies,
+while a projected dual update enforces the error budget.  Under an unknown
+i.i.d. data distribution, a fixed policy class, predictable decisions,
+independent audits, bounded loss, and a safe expert policy, the procedure has
+high-probability error slack and audit-inclusive cost regret of order
+$\widetilde O(T^{2/3})$.  A tightened internal error target gives exact control
+at the requested level $\eps$.  The result is distribution-free over the class
+of i.i.d. distributions, but it is not an arbitrary-sequence guarantee.
+\end{abstract}
+
+\section{Problem and policy comparator}
+
+We first specialize to one cheap AI source, matching the real online
+experiment in the current project.  At round $t$, the learner observes
+non-expert information
+\[
+  Z_t=(X_t,\widehat Y_t,s_t),
+\]
+where $\widehat Y_t$ is the AI label and $s_t\in[0,1]$ is a fixed proxy loss or
+uncertainty score.  The expert label $Y_t$ is initially hidden.  The bounded AI
+loss is
+\[
+  \ell_t=\ell(Y_t,\widehat Y_t)\in[0,1].
+\]
+An expert label is correct and costs one; an unaudited AI label has deployment
+cost zero.  An audited AI label is corrected to $Y_t$ and therefore also costs
+one expert query.
+
+Fix $K\ge2$ and thresholds $\tau_1,\ldots,\tau_{K-1}$ before the online run.  Policy $k$
+defers to the expert when $s_t\ge \tau_k$.  Include an always-expert policy as
+policy $K$.  Write
+\[
+  D_t(k)=
+  \begin{cases}
+    \ind{s_t\ge\tau_k},&k<K,\\
+    1,&k=K,
+  \end{cases}
+\]
+and define the counterfactual loss and base deployment cost of policy $k$ by
+\begin{equation}
+  h_t(k)=(1-D_t(k))\ell_t,
+  \qquad
+  c_t(k)=D_t(k).
+  \label{eq:round-loss-cost}
+\end{equation}
+Thus $h_t(k)$ is the error that policy $k$ would incur before any audit
+correction, and $c_t(k)$ is its ordinary expert-deferral cost.  The vectors
+$\hvec_t=(h_t(1),\ldots,h_t(K))$ and
+$\cvec_t=(c_t(1),\ldots,c_t(K))$ lie in $[0,1]^K$.
+
+For $w\in\simplex:=\{w\in\R_+^K:\sum_k w(k)=1\}$, let
+\begin{equation}
+  H(w)=\E[w^\top\hvec_t],
+  \qquad
+  C(w)=\E[w^\top\cvec_t].
+  \label{eq:population-HC}
+\end{equation}
+The expectation is under the unknown data distribution and the independent
+randomization $k\sim w$.  The population comparator is the randomized-policy
+linear program
+\begin{equation}
+  C^\star(\eps)
+  =
+  \min_{w\in\simplex}\ C(w)
+  \quad\text{subject to}\quad
+  H(w)\le\eps.
+  \label{eq:population-comparator}
+\end{equation}
+The comparator is fixed and non-clairvoyant: it may know the population but it
+never observes $Y_t$ before deciding whether to use AI or the expert.
+Randomized mixtures are included because they convexify the cost--error
+frontier and permit a small tightening of the error target without a
+discontinuous jump in optimal cost.
+
+\section{Assumptions}
+
+The following are a clean sufficient set of assumptions for the first
+simultaneous error-and-cost theorem.  They are deliberately stronger than the
+assumptions of the current arbitrary-sequence error-only theorem.
+
+\begin{assumption}[Unknown i.i.d. stream]
+\label{ass:iid}
+The pairs $(Z_t,Y_t)$ are independent and identically distributed according to
+an arbitrary unknown distribution $P$.  The AI predictor, proxy score, and
+threshold grid are fixed before the stream begins.
+\end{assumption}
+
+\begin{assumption}[Bounded loss and a safe action]
+\label{ass:safe}
+The loss satisfies $0\le\ell_t\le1$.  The always-expert policy $K$ has
+$h_t(K)=0$ and $c_t(K)=1$ pointwise.  The requested target satisfies
+$\eps\in(0,1)$.
+\end{assumption}
+
+\begin{assumption}[Predictability and audit randomization]
+\label{ass:predictability}
+At the start of round $t$, the policy distribution $w_t$, dual variable
+$\lambda_t$, and audit probability are measurable with respect to the past.
+The learner samples its policy and chooses AI versus expert using only the past
+and current $Z_t$.  If AI is selected, the audit draw is conditionally
+independent Bernoulli with its declared probability and is drawn before
+observing $Y_t$.
+\end{assumption}
+
+\begin{assumption}[Counterfactual observability]
+\label{ass:observability}
+Whenever an expert label is obtained, the learner can evaluate $h_t(k)$ for
+every $k\in[K]$.  In the one-source threshold class this is automatic: each
+policy either uses the same AI label, whose loss is then known, or defers and
+has loss zero.
+\end{assumption}
+
+\begin{remark}[What is not assumed]
+No calibration relation such as $s_t=\Pp(\widehat Y_t\ne Y_t\mid Z_t)$ is
+required.  A poor score may make the best threshold in the class expensive,
+but validity and regret relative to that class remain meaningful.  The i.i.d.
+assumption does rule out unrestricted distribution shift and adversarial data
+sequences; see Section~\ref{sec:scope}.
+\end{remark}
+
+\section{Audited primal--dual policy learner}
+
+Let $\bar\eps\in(0,\eps]$ be an internal error target and let
+$\Lambda>0$ be a dual cap.  For the fixed-horizon theorem, take a constant
+audit probability
+\begin{equation}
+  \gamma=T^{-1/3}.
+  \label{eq:gamma-choice}
+\end{equation}
+The probability is constant within a run but vanishes with the horizon.  An
+anytime implementation can use a doubling schedule or $p_t\asymp t^{-1/3}$
+with adaptive learning rates.
+
+When policy $J_t$ is selected, define its actual deferral decision
+$D_t=D_t(J_t)$.  If $D_t=0$, draw $A_t\sim\Ber(\gamma)$; if $D_t=1$, set
+$A_t=0$ because the expert is already queried.  The expert-label observation
+indicator and its conditional probability are
+\begin{equation}
+  O_t=D_t+(1-D_t)A_t,
+  \qquad
+  Q_t=D_t+(1-D_t)\gamma.
+  \label{eq:observation-mask}
+\end{equation}
+Thus $Q_t\in[\gamma,1]$.  The inverse-probability estimate of every policy's
+loss is
+\begin{equation}
+  \widehat h_t(k)
+  =
+  \frac{O_t}{Q_t}h_t(k),
+  \qquad k\in[K].
+  \label{eq:ipw-vector}
+\end{equation}
+When $O_t=0$, the implementation sets the entire vector to zero without
+evaluating the hidden loss.
+
+The primal update uses the estimated Lagrangian loss
+\begin{equation}
+  g_t(k)=c_t(k)+\lambda_t\widehat h_t(k).
+  \label{eq:primal-gradient}
+\end{equation}
+The common term $-\lambda_t\bar\eps$ is omitted because it does not affect the
+exponential-weights normalization.  The dual update uses
+\begin{equation}
+  \widehat v_t=w_t^\top\widehat\hvec_t-\bar\eps.
+  \label{eq:dual-gradient}
+\end{equation}
+
+\begin{algorithm}[ht]
+\caption{Audited primal--dual policy learning}
+\label{alg:primal-dual}
+\small
+\begin{algorithmic}[1]
+\Require Horizon $T$; threshold policies $[K]$ including always-expert;
+target $\bar\eps$; audit rate $\gamma$; dual cap $\Lambda$; learning rates
+$\eta_w,\eta_\lambda$.
+\State Initialize $w_1(k)=1/K$ and $\lambda_1=0$.
+\For{$t=1,\ldots,T$}
+  \State Observe $Z_t=(X_t,\widehat Y_t,s_t)$ and compute
+  $\{D_t(k),c_t(k)\}_{k=1}^K$.
+  \State Sample $J_t\sim w_t$ and set $D_t=D_t(J_t)$.
+  \If{$D_t=1$}
+    \State Query the expert, release $\widetilde Y_t=Y_t$, and set
+    $A_t=0$, $O_t=Q_t=1$.
+  \Else
+    \State Draw $A_t\sim\Ber(\gamma)$.
+    \If{$A_t=1$}
+      \State Query the expert, release the corrected label
+      $\widetilde Y_t=Y_t$, and set $O_t=1$, $Q_t=\gamma$.
+    \Else
+      \State Release $\widetilde Y_t=\widehat Y_t$ and set
+      $O_t=0$, $Q_t=\gamma$.
+    \EndIf
+  \EndIf
+  \State Form $\widehat\hvec_t$ by \eqref{eq:ipw-vector}.
+  \State Set $g_t(k)=c_t(k)+\lambda_t\widehat h_t(k)$ and update
+  \[
+    w_{t+1}(k)
+    =
+    \frac{w_t(k)e^{-\eta_w g_t(k)}}
+    {\sum_{j=1}^K w_t(j)e^{-\eta_w g_t(j)}}.
+  \]
+  \State Set $\widehat v_t=w_t^\top\widehat\hvec_t-\bar\eps$ and update
+  \[
+    \lambda_{t+1}
+    =
+    \Pi_{[0,\Lambda]}
+    \left(\lambda_t+\eta_\lambda\widehat v_t\right).
+  \]
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+The counterfactual and final released-label losses of the selected policy are
+\begin{equation}
+  H_t=h_t(J_t),
+  \qquad
+  G_t=\ell(Y_t,\widetilde Y_t).
+  \label{eq:HG}
+\end{equation}
+Pointwise, $G_t\le H_t$: expert deferrals have zero loss, and audited AI
+mistakes are corrected.  The realized total expert cost is
+\begin{equation}
+  C_t^{\mathrm{tot}}
+  =D_t+(1-D_t)A_t.
+  \label{eq:total-cost}
+\end{equation}
+This counts an audited-and-corrected AI item once, not twice.
+
+\section{Explicit finite-horizon quantities}
+
+The theorem below gives explicit, intentionally conservative constants.  Fix
+$\delta\in(0,1)$ and define
+\begin{equation}
+  x=\log\!\left(\frac{64K}{\delta}\right).
+  \label{eq:x-def}
+\end{equation}
+For $\gamma\in(0,1]$, let
+\begin{align}
+  V_T
+  &:=
+  \frac{T}{\gamma}
+  +\sqrt{\frac{2Tx}{\gamma^3}}
+  +\frac{x}{3\gamma^2},
+  \label{eq:VT}\\
+  S_w
+  &:=2T+2\Lambda^2V_T,
+  \qquad
+  S_\lambda:=2T+2V_T.
+  \label{eq:S-def}
+\end{align}
+Choose
+\begin{align}
+  \eta_w
+  &:=%
+  \min\left\{
+    \frac{1}{2(1+\Lambda/\gamma)},
+    \sqrt{\frac{2\log K}{S_w}}
+  \right\},
+  \label{eq:eta-w}\\
+  \eta_\lambda
+  &:=%
+  \frac{\Lambda}{\sqrt{S_\lambda}}.
+  \label{eq:eta-lambda}
+\end{align}
+Define the primal and dual optimization terms
+\begin{align}
+  R_w
+  &:=%
+  \frac{\log K}{\eta_w}+\frac{\eta_w}{2}S_w,
+  \label{eq:Rw}\\
+  R_\lambda
+  &:=%
+  \frac{\Lambda^2}{2\eta_\lambda}
+  +\frac{\eta_\lambda}{2}S_\lambda
+  =\Lambda\sqrt{S_\lambda},
+  \label{eq:Rlambda}
+\end{align}
+and the stochastic conversion term
+\begin{equation}
+  R_{\mathrm{stoch}}
+  :=
+  2\sqrt{2Tx}
+  +2\Lambda\left(
+    \sqrt{\frac{2Tx}{\gamma}}+\frac{x}{3\gamma}
+  \right).
+  \label{eq:Rstoch}
+\end{equation}
+Finally, set
+\begin{equation}
+  e_T
+  :=
+  \frac{R_w+R_\lambda+R_{\mathrm{stoch}}}{T},
+  \qquad
+  r_T:=\sqrt{\frac{x}{2T}},
+  \qquad
+  a_T:=\gamma+\sqrt{\frac{2\gamma x}{T}}+\frac{x}{3T}.
+  \label{eq:error-terms}
+\end{equation}
+Here $e_T$ is a population saddle-point error, $r_T$ converts population loss
+and cost to the realized stream, and $a_T$ upper-bounds the fraction of extra
+AI audits.
+
+\section{Main bounds}
+
+For a working target $b\in(0,1)$, define the population value
+\[
+  C^\star(b)=\min_{w\in\simplex}\{C(w):H(w)\le b\}.
+\]
+
+\begin{theorem}[Simultaneous finite-horizon bounds]
+\label{thm:main}
+Suppose Assumptions~\ref{ass:iid}--\ref{ass:observability} hold.  Run
+Algorithm~\ref{alg:primal-dual} with internal target $\bar\eps\in(0,1)$,
+$\gamma\in(0,1]$, and $\Lambda>1/\bar\eps$, using
+\eqref{eq:eta-w}--\eqref{eq:eta-lambda}.  Then, with probability at least
+$1-\delta$ over the data, policy randomization, and audits,
+\begin{align}
+  \frac1T\sum_{t=1}^T H_t
+  &\le
+  \bar\eps
+  +\frac{e_T}{\Lambda-1/\bar\eps}
+  +r_T,
+  \label{eq:main-H}\\
+  \frac1T\sum_{t=1}^T G_t
+  &\le
+  \frac1T\sum_{t=1}^T H_t,
+  \label{eq:main-G}\\
+  \frac1T\sum_{t=1}^T C_t^{\mathrm{tot}}
+  &\le
+  C^\star(\bar\eps)+e_T+r_T+a_T.
+  \label{eq:main-cost}
+\end{align}
+Thus the result controls the more demanding counterfactual pre-correction
+loss, and its cost comparison includes all expert deferrals and audits.
+\end{theorem}
+
+The base theorem has a vanishing error slack.  The next corollary spends this
+slack in advance to achieve the requested error level exactly.
+
+\begin{corollary}[Exact control at $\eps$ and regret to $C^\star(\eps)$]
+\label{cor:exact}
+Set
+\begin{equation}
+  \Lambda=\frac{4}{\eps},
+  \qquad
+  \kappa_T=\frac{\eps e_T}{2}+r_T,
+  \qquad
+  \bar\eps=\eps-\kappa_T.
+  \label{eq:tightening}
+\end{equation}
+Assume $\kappa_T\le\eps/2$.  Then, on the event of
+Theorem~\ref{thm:main},
+\begin{align}
+  \frac1T\sum_{t=1}^T G_t
+  &\le
+  \frac1T\sum_{t=1}^T H_t
+  \le\eps,
+  \label{eq:exact-error}\\
+  \frac1T\sum_{t=1}^T C_t^{\mathrm{tot}}
+  &\le
+  C^\star(\eps)
+  +e_T+\frac{\kappa_T}{\eps}+r_T+a_T.
+  \label{eq:exact-cost}
+\end{align}
+In particular, for $\gamma=T^{-1/3}$ and fixed
+$(\eps,K,\delta)$,
+\begin{align}
+  \sum_{t=1}^T H_t&\le\eps T,\\
+  \sum_{t=1}^T C_t^{\mathrm{tot}}
+  &\le
+  TC^\star(\eps)+\widetilde O_\eps(T^{2/3}).
+  \label{eq:T23-summary}
+\end{align}
+The notation $\widetilde O_\eps$ hides logarithmic factors in
+$K,T,1/\delta$ and constants polynomial in $1/\eps$.
+\end{corollary}
+
+\begin{remark}[Why $T^{-1/3}$]
+The extra audit cost is approximately $T\gamma$, while the partial-feedback
+learning term is approximately $\sqrt{T/\gamma}$.  Balancing these terms gives
+$\gamma\asymp T^{-1/3}$ and cumulative order $T^{2/3}$.  A fixed positive
+audit rate would instead incur linear audit cost.
+\end{remark}
+
+\section{Proofs}
+
+We give all intermediate steps because the distinction between observed,
+counterfactual, and released-label loss is central to the result.
+
+\subsection{Unbiased loss estimates and second moments}
+
+Let $\calF_{t-1}$ contain the complete history through round $t-1$.
+For analysis, let $\calG_t$ augment $\calF_{t-1}$ with the current data,
+selected policy, all current counterfactual losses, and the observation
+probability $Q_t$, but not the audit coin when AI is selected.  Conditional on
+$\calG_t$, $O_t$ is Bernoulli with mean $Q_t$; on a deferral, this is the
+degenerate Bernoulli variable equal to one.
+
+\begin{lemma}[Inverse-probability identities]
+\label{lem:ipw}
+For every $k\in[K]$,
+\begin{align}
+  \E[\widehat h_t(k)\mid\calG_t]&=h_t(k),
+  \label{eq:ipw-unbiased}\\
+  \E[\widehat h_t(k)^2\mid\calG_t]
+  &\le\frac{h_t(k)^2}{\gamma}.
+  \label{eq:ipw-second}
+\end{align}
+Moreover,
+\begin{align}
+  \E[w_t^\top\widehat\hvec_t\mid\calF_{t-1}]&=H(w_t),
+  \label{eq:mixture-unbiased}\\
+  \E[w_t^\top(\widehat\hvec_t\odot\widehat\hvec_t)mid\calF_{t-1}]
+  &\le\frac1\gamma.
+  \label{eq:mixture-second}
+\end{align}
+Here $\odot$ denotes componentwise multiplication.
+\end{lemma}
+
+\begin{proof}
+Conditional on $\calG_t$, $h_t(k)$ and $Q_t$ are fixed and
+$\E[O_t\mid\calG_t]=Q_t$.  Hence
+\[
+  \E\left[\frac{O_t}{Q_t}h_t(k)\,\middle|\,\calG_t\right]
+  =h_t(k).
+\]
+Because $O_t^2=O_t$ and $Q_t\ge\gamma$,
+\[
+  \E\left[\left(\frac{O_t}{Q_t}h_t(k)\right)^2
+  \middle|\calG_t\right]
+  =\frac{h_t(k)^2}{Q_t}
+  \le\frac{h_t(k)^2}{\gamma}.
+\]
+Taking iterated expectations over the current i.i.d. data and selected policy
+gives \eqref{eq:mixture-unbiased}.  Summing
+\eqref{eq:ipw-second} with weights $w_t(k)$ and using
+$0\le h_t(k)\le1$ gives \eqref{eq:mixture-second}.
+\end{proof}
+
+The following variance event is what improves the rate over a crude
+$1/\gamma$-range analysis.
+
+\begin{lemma}[High-probability quadratic variation]
+\label{lem:quadratic}
+With probability at least $1-e^{-x}$,
+\begin{equation}
+  \sum_{t=1}^T
+  w_t^\top(\widehat\hvec_t\odot\widehat\hvec_t)
+  \le V_T,
+  \label{eq:quadratic-event}
+\end{equation}
+where $V_T$ is defined in \eqref{eq:VT}.  On this event,
+\begin{align}
+  \sum_{t=1}^T w_t^\top(\boldsymbol g_t\odot\boldsymbol g_t)&\le S_w,
+  \label{eq:primal-square}\\
+  \sum_{t=1}^T\widehat v_t^2&\le S_\lambda.
+  \label{eq:dual-square}
+\end{align}
+\end{lemma}
+
+\begin{proof}
+Set
+$X_t=w_t^\top(\widehat\hvec_t\odot\widehat\hvec_t)$.
+By Lemma~\ref{lem:ipw},
+$\E[X_t\mid\calF_{t-1}]\le1/\gamma$.
+Also $0\le X_t\le1/\gamma^2$.  Conditional on $\calG_t$,
+$X_t=(O_t/Q_t^2)w_t^\top(\hvec_t\odot\hvec_t)$, so
+\[
+  \E[X_t^2\mid\calG_t]
+  \le\frac{1}{Q_t^3}
+  \le\frac{1}{\gamma^3}.
+\]
+Therefore the martingale differences
+$X_t-\E[X_t\mid\calF_{t-1}]$ have increments bounded above by
+$1/\gamma^2$ and total conditional variance at most $T/\gamma^3$.
+Freedman's inequality gives
+\[
+  \sum_{t=1}^T X_t
+  \le
+  \frac{T}{\gamma}
+  +\sqrt{\frac{2Tx}{\gamma^3}}
+  +\frac{x}{3\gamma^2}
+  =V_T.
+\]
+Next, $(a+b)^2\le2a^2+2b^2$ gives
+\[
+  g_t(k)^2
+  \le2c_t(k)^2+2\Lambda^2\widehat h_t(k)^2.
+\]
+Summing with weights $w_t(k)$ proves \eqref{eq:primal-square}.
+Finally, Jensen's inequality gives
+$(w_t^\top\widehat\hvec_t)^2
+\le w_t^\top(\widehat\hvec_t\odot\widehat\hvec_t)$, and hence
+\[
+  \widehat v_t^2
+  \le2(w_t^\top\widehat\hvec_t)^2+2\bar\eps^2.
+\]
+Summation proves \eqref{eq:dual-square}.
+\end{proof}
+
+\subsection{Primal and dual regret}
+
+Define the estimated per-round Lagrangian
+\begin{equation}
+  \widehat F_t(w,\lambda)
+  =w^\top\cvec_t+\lambda(w^\top\widehat\hvec_t-\bar\eps).
+  \label{eq:estimated-F}
+\end{equation}
+
+\begin{lemma}[Estimated saddle regret]
+\label{lem:estimated-saddle}
+On the event in Lemma~\ref{lem:quadratic}, for every
+$u\in\simplex$ and $\lambda\in[0,\Lambda]$,
+\begin{equation}
+  \sum_{t=1}^T\widehat F_t(w_t,\lambda)
+  -\sum_{t=1}^T\widehat F_t(u,\lambda_t)
+  \le R_w+R_\lambda.
+  \label{eq:estimated-saddle-regret}
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Because $g_t(k)\ge0$ and
+$g_t(k)\le1+\Lambda/\gamma$, the first term in the minimum defining
+$\eta_w$ ensures $\eta_wg_t(k)\le1/2$.  The standard exponential-weights
+potential argument, using $e^{-z}\le1-z+z^2/2$ for $z\ge0$, gives
+\[
+  \sum_{t=1}^T w_t^\top\boldsymbol g_t
+  -\sum_{t=1}^T u^\top\boldsymbol g_t
+  \le
+  \frac{\log K}{\eta_w}
+  +\frac{\eta_w}{2}
+  \sum_{t=1}^T w_t^\top(\boldsymbol g_t\odot\boldsymbol g_t)
+  \le R_w.
+\]
+Since the term $-\lambda_t\bar\eps$ is common to $w_t$ and $u$, this is
+equivalently
+\[
+  \sum_{t=1}^T\widehat F_t(w_t,\lambda_t)
+  -\sum_{t=1}^T\widehat F_t(u,\lambda_t)
+  \le R_w.
+\]
+
+For the projected dual-ascent step, nonexpansiveness of Euclidean projection
+implies, for every $\lambda\in[0,\Lambda]$,
+\[
+  \sum_{t=1}^T(\lambda-\lambda_t)\widehat v_t
+  \le
+  \frac{\Lambda^2}{2\eta_\lambda}
+  +\frac{\eta_\lambda}{2}\sum_{t=1}^T\widehat v_t^2
+  \le R_\lambda.
+\]
+The left side equals
+$\sum_t\widehat F_t(w_t,\lambda)
+-\sum_t\widehat F_t(w_t,\lambda_t)$.
+Adding the primal and dual inequalities proves
+\eqref{eq:estimated-saddle-regret}.
+\end{proof}
+
+\subsection{From sampled Lagrangians to the population saddle problem}
+
+Define the population Lagrangian
+\begin{equation}
+  F(w,\lambda)
+  =C(w)+\lambda(H(w)-\bar\eps).
+  \label{eq:population-F}
+\end{equation}
+
+\begin{lemma}[Uniform stochastic conversion]
+\label{lem:conversion}
+With probability at least $1-8Ke^{-x}$, simultaneously for every
+$u\in\simplex$ and $\lambda\in[0,\Lambda]$,
+\begin{align}
+  \Bigg|
+  \sum_{t=1}^T\bigl\{
+  \widehat F_t(w_t,\lambda)-F(w_t,\lambda)
+  \bigr\}
+  \Bigg|
+  &\le
+  \sqrt{2Tx}
+  +\Lambda\left(
+    \sqrt{\frac{2Tx}{\gamma}}+\frac{x}{3\gamma}
+  \right),
+  \label{eq:left-conversion}\\
+  \Bigg|
+  \sum_{t=1}^T\bigl\{
+  \widehat F_t(u,\lambda_t)-F(u,\lambda_t)
+  \bigr\}
+  \Bigg|
+  &\le
+  \sqrt{2Tx}
+  +\Lambda\left(
+    \sqrt{\frac{2Tx}{\gamma}}+\frac{x}{3\gamma}
+  \right).
+  \label{eq:right-conversion}
+\end{align}
+\end{lemma}
+
+\begin{proof}
+We separate cost and loss.  Because $w_t$ is measurable with respect to the
+past and the data are i.i.d.,
+$w_t^\top\cvec_t-C(w_t)$ is a bounded martingale difference.  Azuma--Hoeffding
+controls its absolute sum by $\sqrt{2Tx}$ except on an event of probability at
+most $2e^{-x}$.  For any fixed policy $k$, the same argument controls
+$\sum_t(c_t(k)-C(e_k))$.  A union bound over $k$ and linearity in $u$ extend
+the result to every $u\in\simplex$.
+
+For loss, Lemma~\ref{lem:ipw} shows that
+$w_t^\top\widehat\hvec_t-H(w_t)$ is a martingale difference.  Its increment is
+bounded in absolute value by $1/\gamma$, and its conditional variance is at
+most $1/\gamma$.  Freedman's inequality therefore gives
+\[
+  \left|
+  \sum_{t=1}^T
+  \{w_t^\top\widehat\hvec_t-H(w_t)\}
+  \right|
+  \le
+  \sqrt{\frac{2Tx}{\gamma}}+\frac{x}{3\gamma}
+\]
+outside an event of probability at most $2e^{-x}$.  Multiplying by any fixed
+$\lambda\in[0,\Lambda]$ costs at most a factor $\Lambda$.
+
+For the right side, fix a vertex $e_k$ of the simplex.  The sequence
+\[
+  \lambda_t\{\widehat h_t(k)-H(e_k)\}
+\]
+is a martingale difference with absolute increment at most
+$\Lambda/\gamma$ and conditional variance at most $\Lambda^2/\gamma$.
+Freedman's inequality gives the stated loss bound.  A union bound over $k$ and
+linearity in $u$ give the result for every mixture $u$.  Combining the cost and
+loss events proves the claim; the displayed failure probability is a
+conservative union bound.
+\end{proof}
+
+\begin{proposition}[Population saddle gap]
+\label{prop:saddle-gap}
+Let
+\[
+  \overline w_T=\frac1T\sum_{t=1}^T w_t,
+  \qquad
+  \overline\lambda_T=\frac1T\sum_{t=1}^T\lambda_t.
+\]
+With probability at least $1-\delta/2$,
+\begin{equation}
+  \max_{\lambda\in[0,\Lambda]}F(\overline w_T,\lambda)
+  -\min_{u\in\simplex}F(u,\overline\lambda_T)
+  \le e_T.
+  \label{eq:population-saddle-gap}
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+Intersect the events of Lemmas~\ref{lem:quadratic} and
+\ref{lem:conversion}.  Their total failure probability is below $\delta/2$
+under the choice \eqref{eq:x-def}.  Combining
+Lemma~\ref{lem:estimated-saddle} with the two conversion bounds gives, for
+every $u$ and $\lambda$,
+\[
+  \sum_{t=1}^T F(w_t,\lambda)
+  -\sum_{t=1}^T F(u,\lambda_t)
+  \le R_w+R_\lambda+R_{\mathrm{stoch}}.
+\]
+The population Lagrangian is bilinear, so the left side divided by $T$ equals
+$F(\overline w_T,\lambda)-F(u,\overline\lambda_T)$.  Maximizing over
+$\lambda$ and minimizing over $u$ proves the proposition.
+\end{proof}
+
+\subsection{Exact penalty and separate population bounds}
+
+\begin{lemma}[Safe policy bounds the optimal dual price]
+\label{lem:dual-bound}
+For any target $b\in(0,1)$, the LP defining $C^\star(b)$ has an optimal dual
+price $\lambda^\star_b$ satisfying
+\begin{equation}
+  0\le\lambda^\star_b\le\frac1b.
+  \label{eq:dual-bound}
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+The problem is a finite linear program and is strictly feasible because the
+always-expert policy has loss zero.  Strong duality therefore holds.  Its dual
+function is
+\[
+  d_b(\lambda)
+  =\min_{w\in\simplex}
+  \{C(w)+\lambda(H(w)-b)\}.
+\]
+Evaluating the inner minimum at the always-expert policy gives
+$d_b(\lambda)\le1-\lambda b$.  At a dual optimum,
+$C^\star(b)=d_b(\lambda_b^\star)\ge0$, so
+$0\le1-\lambda_b^\star b$, proving
+$\lambda_b^\star\le1/b$.
+\end{proof}
+
+\begin{lemma}[Saddle gap implies cost and feasibility]
+\label{lem:exact-penalty}
+Suppose \eqref{eq:population-saddle-gap} holds for target $b$ and
+$\Lambda>\lambda_b^\star$.  Then
+\begin{align}
+  C(\overline w_T)&\le C^\star(b)+e_T,
+  \label{eq:population-cost}\\
+  H(\overline w_T)&\le
+  b+\frac{e_T}{\Lambda-\lambda_b^\star}.
+  \label{eq:population-feasibility}
+\end{align}
+\end{lemma}
+
+\begin{proof}
+Let $w_b^\star$ be a primal optimum.  Since it is feasible and
+$\overline\lambda_T\ge0$,
+\[
+  \min_u F(u,\overline\lambda_T)
+  \le F(w_b^\star,\overline\lambda_T)
+  \le C^\star(b).
+\]
+Therefore \eqref{eq:population-saddle-gap} implies
+\begin{equation}
+  C(\overline w_T)
+  +\Lambda[H(\overline w_T)-b]_+
+  \le C^\star(b)+e_T.
+  \label{eq:penalized-upper}
+\end{equation}
+Setting the dual price to zero inside the maximum gives
+\eqref{eq:population-cost}.
+
+Strong duality at $\lambda_b^\star$ gives, for every $w$,
+\[
+  C(w)+\lambda_b^\star(H(w)-b)\ge C^\star(b).
+\]
+If $H(\overline w_T)\le b$, there is nothing to prove.  Otherwise, put
+$v=H(\overline w_T)-b>0$.  Then
+\[
+  C(\overline w_T)+\Lambda v
+  \ge C^\star(b)+(\Lambda-\lambda_b^\star)v.
+\]
+Combining this inequality with \eqref{eq:penalized-upper} yields
+$v\le e_T/(\Lambda-\lambda_b^\star)$.
+\end{proof}
+
+\subsection{Realized loss, realized cost, and proof of the main theorem}
+
+\begin{lemma}[Online-to-realized conversion]
+\label{lem:realized}
+With probability at least $1-6e^{-x}$,
+\begin{align}
+  \frac1T\sum_{t=1}^T H_t
+  &\le H(\overline w_T)+r_T,
+  \label{eq:realized-H}\\
+  \frac1T\sum_{t=1}^T c_t(J_t)
+  &\le C(\overline w_T)+r_T,
+  \label{eq:realized-base-cost}\\
+  \frac1T\sum_{t=1}^T(1-D_t)A_t
+  &\le a_T.
+  \label{eq:realized-audits}
+\end{align}
+\end{lemma}
+
+\begin{proof}
+Conditional on the past, the current data are a fresh i.i.d. draw and
+$J_t\sim w_t$.  Hence
+\[
+  \E[H_t\mid\calF_{t-1}]=H(w_t),
+  \qquad
+  \E[c_t(J_t)\mid\calF_{t-1}]=C(w_t).
+\]
+Both realized variables lie in $[0,1]$.  Hoeffding--Azuma gives
+\eqref{eq:realized-H} and \eqref{eq:realized-base-cost} with the stated
+$r_T$ after a union bound.
+
+For $B_t=(1-D_t)A_t$, predictability and conditional audit independence give
+\[
+  \E[B_t\mid\text{pre-audit information}]
+  =(1-D_t)\gamma\le\gamma.
+\]
+The increments are Bernoulli and have conditional variance at most $\gamma$.
+Freedman's inequality yields
+\[
+  \sum_{t=1}^T B_t
+  \le
+  \gamma T+\sqrt{2\gamma Tx}+\frac{x}{3},
+\]
+which is \eqref{eq:realized-audits}.
+\end{proof}
+
+\begin{proof}[Proof of Theorem~\ref{thm:main}]
+On the population saddle event, Lemmas~\ref{lem:dual-bound} and
+\ref{lem:exact-penalty}, with $b=\bar\eps$, give
+\[
+  C(\overline w_T)\le C^\star(\bar\eps)+e_T,
+  \qquad
+  H(\overline w_T)
+  \le\bar\eps+\frac{e_T}{\Lambda-1/\bar\eps}.
+\]
+The latter uses $\lambda^\star_{\bar\eps}\le1/\bar\eps$.
+Intersect this event with Lemma~\ref{lem:realized}; the definition of $x$
+makes the combined failure probability at most $\delta$.
+Equation \eqref{eq:realized-H} proves \eqref{eq:main-H}.
+Audit-and-correct gives $G_t\le H_t$ pointwise, proving
+\eqref{eq:main-G}.  Finally,
+\[
+  C_t^{\mathrm{tot}}
+  =c_t(J_t)+(1-D_t)A_t.
+\]
+Combining \eqref{eq:realized-base-cost},
+\eqref{eq:realized-audits}, and the population cost bound proves
+\eqref{eq:main-cost}.
+\end{proof}
+
+\subsection{Tightening and proof of the exact-error corollary}
+
+\begin{lemma}[Cost of tightening]
+\label{lem:tightening}
+For every $0\le\kappa\le\eps$,
+\begin{equation}
+  C^\star(\eps-\kappa)
+  \le C^\star(\eps)+\frac{\kappa}{\eps}.
+  \label{eq:value-lipschitz}
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Let $w^\star_\eps$ solve \eqref{eq:population-comparator}, let $e_K$ be the
+always-expert policy, and set $\alpha=\kappa/\eps$.  The mixture
+\[
+  w'=(1-\alpha)w^\star_\eps+\alpha e_K
+\]
+satisfies
+\[
+  H(w')=(1-\alpha)H(w^\star_\eps)
+  \le(1-\alpha)\eps=\eps-\kappa.
+\]
+Its cost obeys
+\[
+  C(w')
+  =(1-\alpha)C^\star(\eps)+\alpha C(e_K)
+  \le C^\star(\eps)+\alpha,
+\]
+because $C(e_K)=1$.  Optimality at level $\eps-\kappa$ proves the claim.
+\end{proof}
+
+\begin{proof}[Proof of Corollary~\ref{cor:exact}]
+Since $\kappa_T\le\eps/2$, we have
+$\bar\eps\ge\eps/2$.  Consequently
+\[
+  \Lambda-\frac1{\bar\eps}
+  \ge\frac4\eps-\frac2\eps
+  =\frac2\eps.
+\]
+Theorem~\ref{thm:main} therefore gives
+\[
+  \frac1T\sum_{t=1}^T H_t
+  \le
+  \bar\eps+\frac{\eps e_T}{2}+r_T
+  =\eps,
+\]
+which proves \eqref{eq:exact-error}.  Lemma~\ref{lem:tightening} and
+\eqref{eq:main-cost} give
+\[
+  \frac1T\sum_{t=1}^T C_t^{\mathrm{tot}}
+  \le
+  C^\star(\eps)+\frac{\kappa_T}{\eps}
+  +e_T+r_T+a_T.
+\]
+
+It remains to check the rate.  With $\gamma=T^{-1/3}$,
+$V_T=\widetilde O(T^{4/3})$.  Hence
+$S_w=\widetilde O(\Lambda^2T^{4/3})$ and
+$S_\lambda=\widetilde O(T^{4/3})$.  The learning rates in
+\eqref{eq:eta-w}--\eqref{eq:eta-lambda} give
+\[
+  R_w+R_\lambda+R_{\mathrm{stoch}}
+  =\widetilde O((1+\Lambda)T^{2/3}).
+\]
+Thus $e_T=\widetilde O((1+\Lambda)T^{-1/3})$ and
+$a_T=O(T^{-1/3})$ up to logarithmic terms.  Substituting
+$\Lambda=4/\eps$ and multiplying the average-cost bound by $T$ proves
+\eqref{eq:T23-summary}.
+\end{proof}
+
+\section{Interpretation and scope}
+\label{sec:scope}
+
+\paragraph{What the theorem adds.}
+The existing online theorem controls error for any data sequence but does not
+compare cost with an oracle.  The present direction adds a primal policy
+learner and proves a comparison with the cheapest fixed randomized threshold
+policy whose population counterfactual loss is at most $\eps$.  All expert
+audits are charged to the algorithm.
+
+\paragraph{Meaning of distribution-free.}
+The result is uniform over all i.i.d. distributions $P$; it assumes no
+parametric model and no calibrated proxy.  It is not distribution-free in the
+stronger arbitrary-sequence sense.  The i.i.d. assumption is what lets past
+audits reveal the future population cost and loss of a fixed policy.
+
+\paragraph{Why the comparator uses counterfactual loss.}
+Audited AI mistakes are corrected, so their final released-label loss is zero.
+Using final loss alone would make an unsafe AI source appear perfect whenever
+it is audited.  The constraint therefore controls $H_t$, the loss the selected
+AI action would have incurred before correction.  Since $G_t\le H_t$, this
+automatically controls the released labels as well.
+
+\paragraph{Fixed scores and policies.}
+The first theorem freezes the AI model, score function, and threshold grid.
+Allowing the proxy itself to be retrained from past audits is a distinct
+adaptive-policy problem.  It would require either sample splitting, a
+complexity-controlled adaptive class, or a sequential uniform-convergence
+argument.
+
+\paragraph{Several cheap sources.}
+The proof extends algebraically to a finite class of multi-source routing
+policies if an observed expert label reveals the counterfactual loss of every
+candidate policy.  In practice this may require evaluating every cheap model.
+Those model-call costs must then be included in $c_t(k)$.  Without such full
+counterfactual observability, the feedback becomes a contextual bandit problem
+and the importance weights and regret rate change.
+
+\paragraph{Conference-paper status.}
+The threshold LP, cost-sensitive routing, and inverse-probability auditing are
+not individually novelty claims.  A defensible contribution would be the
+simultaneous high-probability error and audit-inclusive cost guarantee, ideally
+paired with a lower bound showing whether the $T^{2/3}$ gap-free rate is
+optimal and experiments that report every component of total cost.
+
+\end{document}
