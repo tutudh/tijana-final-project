@@ -1,0 +1,17 @@
+{
+  "calls_made": 4,
+  "candidate_call": "calls/0001-propose",
+  "candidates_started": 1,
+  "consecutive_invalid": 0,
+  "created_at": "2026-07-16T21:55:59.050764+00:00",
+  "next_action": "human_review",
+  "passes": 2,
+  "proof_attempts": 1,
+  "proof_call": "calls/0002-prove",
+  "review_call": "calls/0004-review",
+  "run_id": "20260716T215559Z-3cafc786",
+  "status": "success",
+  "total_cost_usd": 0.0,
+  "updated_at": "2026-07-16T22:18:29.865591+00:00",
+  "version": 1
+}

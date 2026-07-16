@@ -1,0 +1,923 @@
+STATUS: complete
+
+## Exact theorem
+
+For a Borel policy \(a:[0,1]\to[0,1]\), let \(a(s)\) be its probability of releasing the cheap label after observing score \(s\). Define the distribution-aware comparator
+\[
+C_T^\star
+=
+T\left[
+c_M+
+\inf_{\substack{a:[0,1]\to[0,1]\ \mathrm{Borel}\\
+                  \mathbb E[a(S)m(S)]\le\epsilon}}
+\mathbb E[1-a(S)]
+\right].
+\]
+The comparator knows \(P\), but at action time observes only the same model output and score as the learner, never \(Y_t\) or \(L_t\). It has the same deferral, audit, correction, and release actions. Auditing is weakly dominated by immediate expert deferral because both obtain the expert label at the same expert cost while auditing may additionally incur \(c_R\); hence an optimal comparator can use no audits. When deployed on the i.i.d. stream, every feasible comparator has the same \(\epsilon T+O(\sqrt T)\) high-probability released-error semantics.
+
+For \(n\ge1\), define
+\[
+A_n=\sum_{s=1}^n\gamma_s^{-1},
+\]
+and, for \(t\ge2\) with \(n=t-1\),
+\[
+w_t=
+\frac{2\sqrt{2KzA_n}}{n}
++\frac{2Kz}{3n\gamma_n}
++2K\sqrt{\frac{z}{2n}}.
+\]
+Finally let
+\[
+\begin{aligned}
+B_T={}&1+(1+c_R)
+ \left(\sum_{t=1}^T\gamma_t+\sqrt{\frac{Tz}{2}}\right)\\
+&+\sum_{t=2}^T
+ \left(
+ 2K\sqrt{\frac{z}{2(t-1)}}+\frac{K}{2(t-1)}
+ \right)
++\frac1\epsilon
+ \left(
+ \frac{LT}{K}+\sum_{t=2}^Tw_t
+ \right).
+\end{aligned}
+\]
+
+**Candidate theorem.** For every \(T\ge16\), \(\epsilon\in(0,1]\), \(\delta\in(0,1/4)\), \(c_M,c_R\in[0,1]\), finite \(L\), and every distribution satisfying A1–A3, ACU-FTRL satisfies, simultaneously with probability at least \(1-\delta\) over the i.i.d. arrivals and all learner routing and audit coins,
+\[
+\sum_{t=1}^T R_t
+\le
+\epsilon T+\sqrt{\frac{Tz}{2}},
+\]
+and
+\[
+C_T\le C_T^\star+B_T.
+\]
+Moreover, for a universal constant \(C_0\),
+\[
+B_T
+\le
+C_0\left(
+1+c_R+\frac{1+L}{\epsilon}
+\right)
+T^{3/4}\log\frac{32T}{\delta}.
+\]
+Thus, for fixed \((\epsilon,L,c_M,c_R,\delta)\), released error is
+\(\epsilon T+O(\sqrt{T\log T})\) and complete cost regret is
+\(O(T^{3/4}\log T)=o(T)\), at the fixed horizon \(T\).
+
+## Notation and standing assumptions
+
+Let
+\[
+\pi_j=\Pr(S\in B_j),\qquad
+\theta_j=\Pr(S\in B_j,L=1)
+       =\mathbb E[\mathbf1\{S\in B_j\}m(S)].
+\]
+Take bins half-open except for the last, so every score belongs to exactly one bin and every bin has diameter at most \(1/K\).
+
+At \(t=1\), set for analysis
+\[
+D_1=0,\qquad A_1=0,\qquad O_1=1,\qquad p_1=1.
+\]
+This is the prescribed expert action.
+
+Let \(\mathcal F_{t-1}\) be the learner’s post-round filtration from the statement. For importance-weighted analysis, enlarge it before the current routing coins to
+\[
+\mathcal G_{t,-}
+=
+\sigma(\mathcal F_{t-1},S_t,\widehat Y_t,Y_t).
+\]
+This analytical enlargement reveals \(L_t\), but only to the proof. The algorithm still chooses \(x_t\) from \(\mathcal F_{t-1}\), and \(q_t,p_t\) from the past and current score, never from \(Y_t\) or \(L_t\).
+
+Conditional on \(\mathcal G_{t,-}\),
+\[
+O_t\sim{\rm Bernoulli}(p_t),\qquad
+p_t=\max\{1-x_{t,J_t},\gamma_t\}\ge\gamma_t.
+\]
+Indeed,
+\[
+1-x+xq_t(x)=\max\{1-x,\gamma_t\}.
+\]
+
+Since \(\gamma_s=s^{-1/4}\),
+\[
+A_n=\sum_{s=1}^ns^{1/4}\le n^{5/4}.
+\tag{1}
+\]
+
+A randomized comparator deployment is interpreted as using fresh independent roundwise uniforms, independent of the arrival stream and of the learner. Given \(S_t=s\), it releases the unaudited cheap label with probability \(a(s)\) and otherwise immediately defers. This makes explicit the randomization convention needed for the comparator’s high-probability error statement; it is not an additional distributional assumption.
+
+## Lemmas
+
+### Lemma 1 — One-sided Bernstein–Freedman inequality
+
+Let \(X_s\) be martingale differences with \(X_s\le b\), and let
+\[
+V_n=\sum_{s=1}^n\mathbb E[X_s^2\mid\mathcal H_{s-1}].
+\]
+For \(0<\lambda<3/b\),
+\[
+\exp\left\{
+\lambda\sum_{s=1}^nX_s
+-\frac{\lambda^2}{2(1-\lambda b/3)}V_n
+\right\}
+\]
+is a nonnegative supermartingale.
+
+If \(V_n\le v\) deterministically, then for \(z>0\),
+\[
+\Pr\left(
+\sum_{s=1}^nX_s>
+\sqrt{2vz}+\frac{2bz}{3}
+\right)\le e^{-z}.
+\tag{2}
+\]
+
+#### Proof
+
+For every \(x\le b\) and \(0<\lambda<3/b\),
+\[
+e^{\lambda x}
+\le
+1+\lambda x+
+\frac{\lambda^2x^2}{2(1-\lambda b/3)}.
+\]
+For \(\lambda x\le0\), use \(e^u\le1+u+u^2/2\). For \(0\le x\le b\), expand the exponential and use
+\(k!\ge2\cdot3^{k-2}\) for \(k\ge2\).
+
+Conditional expectation, the martingale-difference property, and \(1+u\le e^u\) prove the supermartingale claim. Chernoff optimization gives
+\[
+\Pr\left(\sum_{s=1}^nX_s\ge x\right)
+\le
+\exp\left\{-\frac{x^2}{2(v+bx/3)}\right\}.
+\]
+For \(x=\sqrt{2vz}+2bz/3\),
+\[
+x^2\ge2z(v+bx/3),
+\]
+which proves (2). ∎
+
+### Lemma 2 — Adaptive importance-weighted underestimation
+
+For a fixed bin \(j\), define
+\[
+M_{n,j}
+=
+\sum_{s=1}^n
+\mathbf1\{S_s\in B_j\}L_s
+\left(1-\frac{O_s}{p_s}\right).
+\]
+Except on an event of probability at most \(Te^{-z}\), simultaneously for every \(1\le n\le T\),
+\[
+M_{n,j}
+\le
+\sqrt{2V_{n,j}z}+\frac{z}{3\gamma_n},
+\tag{3}
+\]
+where
+\[
+V_{n,j}=\sum_{s=1}^n\frac{\mathbf1\{S_s\in B_j\}}{p_s}.
+\]
+
+#### Proof
+
+Let
+\[
+X_{s,j}
+=
+\mathbf1\{S_s\in B_j\}L_s
+\left(1-\frac{O_s}{p_s}\right).
+\]
+Conditional on \(\mathcal G_{s,-}\),
+\[
+\mathbb E[X_{s,j}\mid\mathcal G_{s,-}]=0,\qquad X_{s,j}\le1,
+\]
+and
+\[
+\mathbb E[X_{s,j}^2\mid\mathcal G_{s,-}]
+=
+\mathbf1\{S_s\in B_j\}L_s\left(\frac1{p_s}-1\right)
+\le\frac{\mathbf1\{S_s\in B_j\}}{p_s}.
+\tag{4}
+\]
+Thus \(V_{n,j}\) is a predictable quadratic-variation upper bound.
+
+For any \(\mu>0\), put
+\[
+\lambda=\frac{\mu}{1+\mu/3}\in(0,3).
+\]
+Lemma 1 and Ville’s inequality show that, except with probability \(e^{-z}\),
+\[
+M_{n,j}
+\le
+\frac{\mu V_{n,j}}2+\frac z\mu+\frac z3
+\tag{5}
+\]
+simultaneously over \(n\).
+
+Use the deterministic multiplicative grid between
+\[
+\mu_{\min}=\sqrt{\frac{2z}{A_T}},
+\qquad
+\mu_{\max}=\sqrt{2z},
+\]
+with consecutive ratio at most \(r=1+T^{-1/2}\). Its cardinality is at most
+\[
+2+\frac{(5/8)\log T}{\log(1+T^{-1/2})}
+\le
+2+\frac54\sqrt T\log T
+\le T
+\]
+for \(T\ge16\). For the last inequality, writing \(u=\sqrt T\ge4\), the difference
+\(u^2-2-(5/2)u\log u\) is nonnegative at \(u=4\) and increasing thereafter.
+
+If \(V_{n,j}=0\), then \(M_{n,j}=0\). Otherwise
+\(1\le V_{n,j}\le A_T\), so
+\[
+\mu^\star=\sqrt{\frac{2z}{V_{n,j}}}
+\in[\mu_{\min},\mu_{\max}].
+\]
+Choose a grid point \(\mu=\rho\mu^\star\), \(1\le\rho\le r\). Then
+\[
+\frac{\mu V}{2}+\frac z\mu
+=
+\sqrt{2Vz}\frac{\rho+\rho^{-1}}2
+\le
+\sqrt{2Vz}+\frac{\sqrt{2Vz}}{2T}.
+\tag{6}
+\]
+
+Here \(z>8\), since \(T\ge16\), \(K\ge2\), and \(\delta<1/4\). For \(2\le n\le T\), using \(V_{n,j}\le A_n\le n^{5/4}\),
+\[
+\frac{\sqrt{2V_{n,j}z}}{2T}
+\le
+\frac{(n^{1/4}-1)z}{3}.
+\tag{7}
+\]
+For \(n=2,3,4\), this follows directly from \(T\ge16,z\ge8\). For \(n\ge5\), use \(T\ge n\) and
+\[
+\frac34n^{-3/8}\le n^{1/4}-1.
+\]
+At \(n=1\), \(O_1=p_1=1\), so \(M_{1,j}=0\).
+
+Combining (5)–(7) gives
+\[
+M_{n,j}
+\le
+\sqrt{2V_{n,j}z}+\frac{n^{1/4}z}{3}
+=
+\sqrt{2V_{n,j}z}+\frac z{3\gamma_n}.
+\]
+Unioning over at most \(T\) grid points proves (3). ∎
+
+### Lemma 3 — Simultaneous calibration validity
+
+Except on an event of probability at most \(2KTe^{-z}\), simultaneously for all \(t\ge2\) and bins \(j\),
+\[
+\theta_j\le U_{t,j}.
+\tag{8}
+\]
+
+#### Proof
+
+Let \(n=t-1\) and
+\[
+E_{n,j}
+=
+\sum_{s=1}^n\mathbf1\{S_s\in B_j\}L_s.
+\]
+The summands are i.i.d. Bernoulli with mean \(\theta_j\), so
+\[
+\Pr\left(
+\theta_j-\frac{E_{n,j}}n>
+\sqrt{\frac z{2n}}
+\right)\le e^{-z}.
+\]
+Unioning over \(j,n\) costs at most \(KTe^{-z}\).
+
+Moreover,
+\[
+E_{n,j}-H_{t,j}=M_{n,j}.
+\]
+Lemma 2, unioned over \(K\) bins, therefore gives
+\[
+\theta_j
+\le
+\frac{H_{t,j}}n+
+\frac{\sqrt{2V_{t,j}z}+z/(3\gamma_n)}n
++\sqrt{\frac z{2n}}
+=
+\widehat a_{t,j}+r_{t,j}.
+\]
+Since \(0\le\theta_j\le1\), clipping the right side to \([0,1]\) preserves the inequality. ∎
+
+### Lemma 4 — Population safety and released-error concentration
+
+On the event in Lemma 3, except for one additional event of probability \(e^{-z}\),
+\[
+\sum_{t=1}^TR_t
+\le
+\epsilon T+\sqrt{\frac{Tz}{2}}.
+\tag{9}
+\]
+
+#### Proof
+
+Define
+\[
+G_t=\mathbf1\{\theta_j\le U_{t,j}\text{ for every }j\},
+\qquad t\ge2,
+\]
+and \(G_1=1\). Since \(\theta\) is a fixed population vector and \(U_t\) depends only on past observations, \(G_t\) is \(\mathcal F_{t-1}\)-measurable.
+
+When \(G_t=1\),
+\[
+\begin{aligned}
+\mathbb E[D_tL_t\mid\mathcal F_{t-1}]
+&=\sum_{j=1}^Kx_{t,j}\theta_j\\
+&\le\sum_{j=1}^Kx_{t,j}U_{t,j}
+\le\epsilon.
+\end{aligned}
+\]
+Because \(R_t=D_t(1-A_t)L_t\le D_tL_t\),
+\[
+\mathbb E[G_tR_t\mid\mathcal F_{t-1}]
+\le\epsilon G_t\le\epsilon.
+\]
+The variables
+\[
+G_tR_t-\mathbb E[G_tR_t\mid\mathcal F_{t-1}]
+\]
+are martingale differences with conditional range length at most \(1\). Hoeffding–Azuma gives
+\[
+\sum_{t=1}^TG_tR_t
+\le
+\epsilon T+\sqrt{\frac{Tz}{2}}
+\]
+except with probability \(e^{-z}\). On Lemma 3’s event, every \(G_t=1\), proving (9) without conditioning a martingale inequality on a future confidence event. ∎
+
+### Lemma 5 — Comparator attainment and discretization
+
+The infimum defining \(C_T^\star\) is attained by a Borel policy \(a^\star\). If
+\[
+b_j=
+\mathbb E[a^\star(S)\mid S\in B_j]
+\]
+for \(\pi_j>0\), and \(b_j=0\) for \(\pi_j=0\), then
+\[
+\sum_j\pi_j(1-b_j)
+=
+\mathbb E[1-a^\star(S)]
+\tag{10}
+\]
+and
+\[
+\sum_j\theta_jb_j
+\le
+\epsilon+\frac LK.
+\tag{11}
+\]
+
+#### Proof
+
+The Lipschitz version of \(m\) on the score support has a Borel Lipschitz extension to \([0,1]\), clipped to \([0,1]\). Thus \(m(S)\) can be represented by a Borel function.
+
+If \(\mathbb E[m(S)]\le\epsilon\), take \(a^\star\equiv1\). Otherwise select \(\lambda\in(0,1]\) such that
+\[
+\mathbb E[m(S)\mathbf1\{m(S)<\lambda\}]
+\le\epsilon
+\le
+\mathbb E[m(S)\mathbf1\{m(S)\le\lambda\}].
+\]
+Choose \(\rho\in[0,1]\) so that
+\[
+a^\star(s)
+=
+\mathbf1\{m(s)<\lambda\}
++\rho\mathbf1\{m(s)=\lambda\}
+\]
+satisfies
+\[
+\mathbb E[a^\star(S)m(S)]=\epsilon.
+\]
+For every feasible \(a\),
+\[
+(a-a^\star)(m-\lambda)\ge0
+\]
+pointwise. Consequently,
+\[
+\mathbb E[am]-\mathbb E[a^\star m]
+\ge
+\lambda\big(\mathbb E[a]-\mathbb E[a^\star]\big).
+\]
+The left side is nonpositive, hence
+\(\mathbb E[a]\le\mathbb E[a^\star]\). Thus \(a^\star\) is optimal.
+
+Equation (10) is conditional expectation. For (11), let
+\(\bar m_j=\mathbb E[m(S)\mid S\in B_j]\). On a nonempty bin,
+\[
+|\bar m_j-m(S)|\le\frac LK
+\quad\text{a.s. on }B_j.
+\]
+Therefore
+\[
+\begin{aligned}
+\sum_j\theta_jb_j-\mathbb E[a^\star(S)m(S)]
+&=
+\sum_j\pi_j
+ \mathbb E\!\left[
+ a^\star(S)(\bar m_j-m(S))\mid S\in B_j
+ \right]\\
+&\le\frac LK\sum_j\pi_j
+=\frac LK.
+\end{aligned}
+\]
+Feasibility of \(a^\star\) proves (11). ∎
+
+### Lemma 6 — Comparator-directed importance-weighted bound
+
+For the fixed deterministic vector \(b\) from Lemma 5, except on an event \(\mathcal E_b^c\) of probability at most \(2Te^{-z}\), simultaneously for every \(t\ge2\), with \(n=t-1\),
+\[
+b^\top\left(\frac{H_t}{n}-\theta\right)
+\le
+\frac{\sqrt{2A_nz}}n
++\frac{2z}{3n\gamma_n}
++\sqrt{\frac z{2n}}.
+\tag{12}
+\]
+
+#### Proof
+
+Decompose
+\[
+\begin{aligned}
+b^\top H_t-nb^\top\theta
+={}&
+\sum_{s=1}^n
+b_{J_s}L_s\left(\frac{O_s}{p_s}-1\right)\\
+&+
+\sum_{s=1}^n
+\big(b_{J_s}L_s-b^\top\theta\big).
+\end{aligned}
+\tag{13}
+\]
+
+The first sum is a martingale. For fixed \(n\), each increment is bounded above by
+\[
+p_s^{-1}\le\gamma_s^{-1}\le\gamma_n^{-1},
+\]
+and its conditional second moment is at most \(p_s^{-1}\). Hence its predictable quadratic variation is at most
+\[
+\sum_{s=1}^np_s^{-1}\le A_n.
+\]
+Lemma 1 gives
+\[
+\sum_{s=1}^n
+b_{J_s}L_s\left(\frac{O_s}{p_s}-1\right)
+\le
+\sqrt{2A_nz}+\frac{2z}{3\gamma_n}
+\]
+except with probability \(e^{-z}\).
+
+The second sum in (13) consists of i.i.d. centered variables whose uncentered versions lie in \([0,1]\). Hoeffding gives the upper bound
+\[
+\sqrt{\frac{nz}{2}}
+\]
+except with probability \(e^{-z}\). Unioning both bounds over \(n\le T-1\) proves (12). ∎
+
+### Lemma 7 — Robust comparator feasibility
+
+On \(\mathcal E_b\), for every \(t\ge2\),
+\[
+U_t^\top b\le\epsilon+\frac LK+w_t.
+\tag{14}
+\]
+Thus
+\[
+y_t=\frac{\epsilon}{\epsilon+L/K+w_t}\,b
+\tag{15}
+\]
+is feasible for the round-\(t\) FTRL problem, and
+\[
+\pi^\top(1-y_t)
+\le
+\mathbb E[1-a^\star(S)]
++\frac{L/K+w_t}{\epsilon}.
+\tag{16}
+\]
+
+#### Proof
+
+Since \(H_{t,j},r_{t,j}\ge0\),
+\[
+U_{t,j}\le\frac{H_{t,j}}n+r_{t,j}.
+\]
+Cauchy–Schwarz and \(p_s\ge\gamma_s\) give
+\[
+\begin{aligned}
+\sum_jr_{t,j}
+&\le
+\frac{\sqrt{2Kz\sum_jV_{t,j}}}{n}
++\frac{Kz}{3n\gamma_n}
++K\sqrt{\frac z{2n}}\\
+&\le
+\frac{\sqrt{2KzA_n}}n
++\frac{Kz}{3n\gamma_n}
++K\sqrt{\frac z{2n}}
+=\frac{w_t}{2}.
+\end{aligned}
+\tag{17}
+\]
+Because \(K\ge2\), the right side of (12) is at most \(w_t/2\). Hence, using Lemma 5,
+\[
+U_t^\top b
+\le
+\theta^\top b+w_t
+\le
+\epsilon+\frac LK+w_t.
+\]
+This proves (14), and (15) then satisfies \(U_t^\top y_t\le\epsilon\).
+
+Writing \(\alpha_t=\epsilon/(\epsilon+L/K+w_t)\),
+\[
+\begin{aligned}
+\pi^\top(1-y_t)
+&=\pi^\top(1-b)+(1-\alpha_t)\pi^\top b\\
+&\le
+\mathbb E[1-a^\star(S)]
++\frac{L/K+w_t}{\epsilon},
+\end{aligned}
+\]
+which proves (16). ∎
+
+### Lemma 8 — Corrected FTRL deferral comparison
+
+Let
+\[
+\mathcal E_\pi
+=
+\left\{
+\max_j|\widehat\pi_{t,j}-\pi_j|
+\le\sqrt{\frac z{2(t-1)}}
+\text{ for every }t\ge2
+\right\}.
+\]
+Then
+\[
+\Pr(\mathcal E_\pi^c)\le2KTe^{-z}.
+\tag{18}
+\]
+On the intersection \(\mathcal E_b\cap\mathcal E_\pi\), simultaneously for all \(t\ge2\),
+\[
+\begin{aligned}
+\mathbb E[1-x_{t,J_t}\mid\mathcal F_{t-1}]
+\le{}&
+\mathbb E[1-a^\star(S)]
++2K\sqrt{\frac z{2(t-1)}}\\
+&+\frac{K}{2(t-1)}
++\frac{L/K+w_t}{\epsilon}.
+\end{aligned}
+\tag{19}
+\]
+Consequently, viewed as an unconditional simultaneous claim, its failure probability is at most
+\[
+(2KT+2T)e^{-z}.
+\tag{20}
+\]
+
+#### Proof
+
+For fixed \(n,j\), Hoeffding gives
+\[
+\Pr\left(
+|\widehat\pi_{t,j}-\pi_j|>
+\sqrt{\frac z{2n}}
+\right)\le2e^{-z}.
+\]
+Unioning over \(j,n\) proves (18).
+
+On \(\mathcal E_b\), Lemma 7 makes \(y_t\) feasible. FTRL optimality therefore yields
+\[
+n\widehat\pi_t^\top(1-x_t)+\frac12\|x_t\|_2^2
+\le
+n\widehat\pi_t^\top(1-y_t)+\frac12\|y_t\|_2^2.
+\]
+Since \(\|y_t\|_2^2\le K\),
+\[
+\widehat\pi_t^\top(1-x_t)
+\le
+\widehat\pi_t^\top(1-y_t)+\frac K{2n}.
+\tag{21}
+\]
+On \(\mathcal E_\pi\), for every \(u\in[0,1]^K\),
+\[
+\left|
+\pi^\top(1-u)-\widehat\pi_t^\top(1-u)
+\right|
+\le
+K\sqrt{\frac z{2n}}.
+\]
+Applying this twice in (21) gives
+\[
+\pi^\top(1-x_t)
+\le
+\pi^\top(1-y_t)
++2K\sqrt{\frac z{2n}}
++\frac K{2n}.
+\]
+Now apply (16). Finally, since \(x_t\) is \(\mathcal F_{t-1}\)-measurable and \(S_t\) is independent of \(\mathcal F_{t-1}\),
+\[
+\mathbb E[1-x_{t,J_t}\mid\mathcal F_{t-1}]
+=\pi^\top(1-x_t).
+\]
+This proves (19). Equation (20) follows from (18) and
+\(\Pr(\mathcal E_b^c)\le2Te^{-z}\).
+
+This explicitly repairs the reviewer-identified gap: the comparison is asserted only when both the bin-frequency event and Lemma 6’s robust-feasibility event hold. ∎
+
+### Lemma 9 — Complete realized-cost concentration
+
+Except on an event of probability \(e^{-z}\),
+\[
+\begin{aligned}
+C_T
+\le{}&c_MT+1
++\sum_{t=2}^T
+\mathbb E[1-x_{t,J_t}\mid\mathcal F_{t-1}]\\
+&+(1+c_R)
+\left(
+\sum_{t=1}^T\gamma_t+\sqrt{\frac{Tz}{2}}
+\right).
+\end{aligned}
+\tag{22}
+\]
+
+#### Proof
+
+For \(t\ge2\), let
+\[
+W_t=O_t+c_RD_tA_tL_t.
+\]
+Conditional on the current latent arrival and the past,
+\[
+\begin{aligned}
+\mathbb E[W_t\mid\mathcal G_{t,-}]
+&=(1-x_{t,J_t})
++x_{t,J_t}q_t(x_{t,J_t})(1+c_RL_t)\\
+&\le
+1-x_{t,J_t}+(1+c_R)\gamma_t,
+\end{aligned}
+\tag{23}
+\]
+because \(xq_t(x)=[x+\gamma_t-1]_+\le\gamma_t\).
+
+Averaging (23) over the current i.i.d. arrival,
+\[
+\mathbb E[W_t\mid\mathcal F_{t-1}]
+\le
+\mathbb E[1-x_{t,J_t}\mid\mathcal F_{t-1}]
++(1+c_R)\gamma_t.
+\]
+Also \(0\le W_t\le1+c_R\). Hoeffding–Azuma therefore gives
+\[
+\sum_{t=2}^TW_t
+\le
+\sum_{t=2}^T\mathbb E[W_t\mid\mathcal F_{t-1}]
++(1+c_R)\sqrt{\frac{Tz}{2}}
+\]
+except with probability \(e^{-z}\).
+
+Every round pays \(c_M\), and round \(1\) pays exactly one expert cost. Enlarging \(\sum_{t=2}^T\gamma_t\) to \(\sum_{t=1}^T\gamma_t\) proves (22). ∎
+
+### Lemma 10 — Comparator action, cost, and probability parity
+
+For any feasible Borel \(a\), its fresh-independent no-audit deployment has expected total cost
+\[
+T\left(c_M+\mathbb E[1-a(S)]\right),
+\]
+and for every \(u>0\),
+\[
+\Pr\left(
+\sum_{t=1}^TR_t^{\rm comp}>
+\epsilon T+\sqrt{\frac{Tu}{2}}
+\right)\le e^{-u}.
+\tag{24}
+\]
+Allowing the comparator to audit cannot reduce its cost below the no-audit benchmark.
+
+#### Proof
+
+Under the specified deployment, the comparator immediately defers with probability \(1-a(S)\) and otherwise releases the unaudited cheap label. It therefore pays \(c_M\) always, pays the expert with probability \(1-a(S)\), and pays no correction cost.
+
+Its released loss has mean
+\[
+\mathbb E[a(S)L]=\mathbb E[a(S)m(S)]\le\epsilon.
+\]
+The arrivals and comparator uniforms are independent across rounds, so these released losses are independent \([0,1]\)-valued variables. Hoeffding proves (24).
+
+If a comparator audits a cheap-routed item, replacing that audit by immediate deferral produces the same authoritative released label and the same unit expert cost, while removing the possible \(c_R\) correction charge. Thus an optimal comparator uses no audits. ∎
+
+## Main proof
+
+Let the following events hold:
+
+- \(\mathcal E_{\rm cal}\): Lemma 3’s simultaneous calibration event;
+- \(\mathcal E_b\): Lemma 6’s comparator-directed event;
+- \(\mathcal E_\pi\): Lemma 8’s empirical-frequency event;
+- \(\mathcal E_R\): Lemma 4’s masked released-error martingale event;
+- \(\mathcal E_C\): Lemma 9’s cost martingale event.
+
+Their total failure probability is at most
+\[
+\left(2KT+2T+2KT+2\right)e^{-z}.
+\]
+Since
+\[
+e^{-z}=\frac{\delta}{32KT},
+\]
+this is strictly less than \(\delta\).
+
+On \(\mathcal E_{\rm cal}\cap\mathcal E_R\), Lemma 4 gives
+\[
+\sum_{t=1}^TR_t
+\le
+\epsilon T+\sqrt{\frac{Tz}{2}}.
+\]
+
+On \(\mathcal E_b\cap\mathcal E_\pi\cap\mathcal E_C\), combine Lemmas 8 and 9:
+\[
+\begin{aligned}
+C_T
+\le{}&c_MT+1
++(T-1)\mathbb E[1-a^\star(S)]\\
+&+\sum_{t=2}^T
+\left(
+2K\sqrt{\frac{z}{2(t-1)}}+\frac{K}{2(t-1)}
+\right)\\
+&+\frac1\epsilon
+\sum_{t=2}^T\left(\frac LK+w_t\right)\\
+&+(1+c_R)
+\left(
+\sum_{t=1}^T\gamma_t+\sqrt{\frac{Tz}{2}}
+\right).
+\end{aligned}
+\]
+Because
+\[
+(T-1)\mathbb E[1-a^\star(S)]
+\le T\mathbb E[1-a^\star(S)]
+\]
+and
+\[
+\sum_{t=2}^T\frac LK\le\frac{LT}{K},
+\]
+the right side is at most
+\[
+T\left[c_M+\mathbb E[1-a^\star(S)]\right]+B_T
+=C_T^\star+B_T.
+\]
+
+It remains to prove the claimed rate. Let
+\[
+\ell=\log\frac{32T}{\delta}.
+\]
+For \(T\ge16\),
+\[
+T^{1/4}\le K\le2T^{1/4},
+\qquad
+z=\ell+\log K\le\frac32\ell.
+\tag{25}
+\]
+Also,
+\[
+\sum_{t=1}^Tt^{-1/4}\le\frac43T^{3/4},
+\tag{26}
+\]
+and
+\[
+\sum_{n=1}^{T-1}n^{-3/8}\le\frac85T^{5/8},\quad
+\sum_{n=1}^{T-1}n^{-3/4}\le4T^{1/4},
+\tag{27}
+\]
+\[
+\sum_{n=1}^{T-1}n^{-1/2}\le2T^{1/2},\quad
+\sum_{n=1}^{T-1}n^{-1}\le1+\log T.
+\tag{28}
+\]
+
+Using \(A_n\le n^{5/4}\), (25)–(28), and \(\sqrt z\le z\le(3/2)\ell\),
+\[
+\begin{aligned}
+\sum_{t=2}^Tw_t
+&\le
+\frac{16}{5}\sqrt{2Kz}\,T^{5/8}
++\frac83KzT^{1/4}
++2\sqrt2K\sqrt{zT}\\
+&\le27T^{3/4}\ell.
+\end{aligned}
+\tag{29}
+\]
+Similarly,
+\[
+\sum_{t=2}^T
+\left(
+2K\sqrt{\frac{z}{2(t-1)}}+\frac{K}{2(t-1)}
+\right)
+\le10T^{3/4}\ell.
+\tag{30}
+\]
+Furthermore,
+\[
+\frac{LT}{K}\le LT^{3/4},
+\tag{31}
+\]
+and
+\[
+\sum_{t=1}^T\gamma_t+\sqrt{\frac{Tz}{2}}
+\le3T^{3/4}\ell.
+\tag{32}
+\]
+
+Put \(X=T^{3/4}\ell\), \(A=1+c_R\), and
+\(Q=(1+L)/\epsilon\). From (29)–(32),
+\[
+B_T
+\le
+X\left(11+3A+\frac{L+27}{\epsilon}\right).
+\]
+Since \(A\ge1\) and
+\[
+\frac{L+27}{\epsilon}
+\le27\frac{1+L}{\epsilon}=27Q,
+\]
+we obtain
+\[
+B_T\le27(A+Q)X.
+\]
+Thus the rate statement holds, for example, with the universal constant
+\[
+C_0=27.
+\]
+
+## Randomness and filtration accounting
+
+Before the model call, \(x_t\) is \(\mathcal F_{t-1}\)-measurable. After observing \(S_t\), the scalar \(x_{t,J_t}\), audit probability \(q_t\), and observation probability \(p_t\) are measurable from the past, current score, and routing probability. None depends on the current \(Y_t\) or \(L_t\).
+
+The proof-only filtration \(\mathcal G_{t,-}\) reveals the latent current arrival before routing and audit coins. Conditional on it,
+\[
+\mathbb E\left[\frac{O_tL_t}{p_t}\,\middle|\,\mathcal G_{t,-}\right]=L_t.
+\]
+Thus both orientations
+\[
+L_t\left(1-\frac{O_t}{p_t}\right),
+\qquad
+L_t\left(\frac{O_t}{p_t}-1\right)
+\]
+are legitimate martingale differences. The learner never observes either expression when \(O_t=0\); it merely records the prescribed zero contribution to \(H\).
+
+The current observation probability may depend on all prior importance-weighted feedback. Lemma 2 remains valid because it constructs supermartingales for deterministic tuning parameters and applies Ville’s inequality before unioning over a deterministic grid. It never conditions on a future confidence event or substitutes a random variance into a fixed-variance tail bound.
+
+Released-error concentration uses the predictable mask \(G_t\). Cost concentration is applied directly to the fully accounted round cost
+\[
+O_t+c_RD_tA_tL_t.
+\]
+
+The losses remain separate:
+
+- \(L_t\) is the counterfactual cheap-source loss;
+- \(R_t=D_t(1-A_t)L_t\) is final released-label loss;
+- \(O_tL_t/p_t\) is importance-weighted feedback.
+
+Every learner round pays the model cost. Expert deferrals, audits, and audited-error corrections are all included in \(C_T\). The comparator also pays every model call and every expert call. Its optimal representative uses no audit and therefore incurs no correction charge.
+
+## Boundary cases and counterexample attempts
+
+Empty bins have \(\pi_j=\theta_j=0\); setting \(b_j=0\) is harmless. Atoms at grid boundaries are assigned uniquely by the half-open convention. Atoms at the optimal comparator threshold are handled by \(\rho\).
+
+The audit rule is always valid: if its numerator is positive,
+\[
+0<x+\gamma_t-1\le x,
+\]
+so \(q_t(x)\in[0,1]\). For \(x=0\), deferral observes the label with probability one.
+
+If \(m\equiv0\), the comparator releases every cheap prediction. Early conservative deferrals and audits remain bounded by \(B_T\). If \(L=0\), the continuum-to-bin approximation term vanishes. The cases \(\epsilon=1\), \(c_M\in\{0,1\}\), and \(c_R\in\{0,1\}\) require no modification.
+
+Arbitrary score-error relations without A3 can encode many unrelated score regions, making safe regions statistically unidentified under sublinear feedback. A3 excludes that obstruction globally. No monotonicity or raw-score calibration identity is used.
+
+An exact-boundary comparator does not require a margin, strict complementarity, or uniqueness: Lemma 7 scales its binned policy toward the safe expert and explicitly pays \((L/K+w_t)/\epsilon\).
+
+The reviewer’s smallest-failure construction—exact empirical bin frequencies but an upward importance-weighted deviation—is excluded precisely by \(\mathcal E_b\). The corrected Lemma 8 includes that event rather than attributing the whole comparison solely to frequency concentration.
+
+## Self-audit
+
+1. The most delicate step is Lemma 2’s curved, random-variance boundary. The proof reduces it to deterministic-\(\mu\) Ville bounds and explicitly verifies the grid cardinality and numerical absorption using \(T\ge16\) and \(z>8\).
+
+2. Lemma 8 depends on two logically separate events: empirical frequencies and comparator-directed importance weighting. They are now stated separately and both are included in the main intersection.
+
+3. Comparator attainment relies on a measurable Lipschitz version of \(m\) and threshold randomization on an atom. A direct test is to reduce the comparator problem to the distribution of the scalar \(m(S)\), where the threshold construction is explicit.
+
+4. The comparator’s high-probability statement requires fresh independent roundwise randomization. That convention is now explicit; the deterministic benchmark value itself does not depend on comparator coin realizations.
+
+## Open obligations
+
+None.

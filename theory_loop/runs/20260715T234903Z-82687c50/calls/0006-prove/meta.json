@@ -1,0 +1,13 @@
+{
+  "backend": "codex",
+  "completed_at": "2026-07-16T00:40:21.067921+00:00",
+  "cost_usd": 0.0,
+  "duration_seconds": 421.6,
+  "error": "",
+  "model": null,
+  "number": 6,
+  "ok": true,
+  "raw_status": "complete",
+  "stage": "prove",
+  "status": "complete"
+}
