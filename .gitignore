@@ -17,6 +17,7 @@ __pycache__/
 
 # Local/editor metadata
 .claude/
+.agents/
 
 # Drafts and external reference PDFs not needed to compile the report
 1.pdf
@@ -25,19 +26,18 @@ __pycache__/
 4.pdf
 PAC.pdf
 
-# HW4 source extras not needed for this project repository
-HW4_副本/*.aux
-HW4_副本/*.fdb_latexmk
-HW4_副本/*.fls
-HW4_副本/*.log
-HW4_副本/*.out
-HW4_副本/*.pdf
-HW4_副本/*.tex
-HW4_副本/hw4_*_results.csv
-
 # Smoke-test outputs
 results/simple_offline_pac_smoke/
 results/simple_offline_pac_baseline_smoke/
 
 .vscode/
 .sixth/
+
+# Local theory-harness runs contain model outputs and response metadata.
+theory_harness/runs/
+theory_scaffold/runs/*
+!theory_scaffold/runs/.gitkeep
+
+# Local theory-loop runs contain model outputs.
+theory_loop/runs/*
+!theory_loop/runs/.gitkeep
