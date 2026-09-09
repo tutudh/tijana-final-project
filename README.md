@@ -1,10 +1,11 @@
 # Cost-Aware PAC Labeling
 
-This repository contains the paper, slides, code, data, and tracked results for
-the STATS 357 project report **Online PAC Labeling from a Linear Programming
-Perspective**. The project studies how to combine cheap model-generated labels
-with costly expert labels while controlling average released-label error. The
-work is being developed toward an AISTATS 2026 submission.
+This project studies how to combine cheap model-generated labels with costly
+expert labels while controlling average released-label error. It began with
+the STATS 357 report **Online PAC Labeling from a Linear Programming
+Perspective** and now includes an independent research draft on joint online
+error and cost guarantees, alongside the report, slides, code, and tracked
+experiments.
 
 For the dated research snapshot and current evidence, see
 [`docs/RESEARCH_STATE.md`](docs/RESEARCH_STATE.md). For the detailed path to a
@@ -13,7 +14,17 @@ research-paper draft, see
 
 ## Repository Contents
 
-- `main.tex` / `main.pdf`: primary 16-page project paper and compiled artifact.
+- `main.tex` / `main.pdf`: initial 16-page project report and compiled artifact.
+- `working_draft.tex`: independent integrated research draft, titled
+  **Online PAC Labeling with Joint Error and Cost Guarantees**. It develops the OBSR
+  algorithm and joint upper bound, a nominal-target tightening corollary,
+  the CICAT lower bound, and a precisely defined minimax consequence, with
+  complete proofs, comparisons to public literature, and a fully specified
+  calibration baseline for its proposed experiments. Reading or compiling it
+  does not require `main.pdf`, the theory-loop files, or other local inputs.
+  Development provenance is kept in `docs/RESEARCH_STATE.md`. The results
+  remain research candidates pending human review; OBSR experiments have not
+  yet been run.
 - `slides/`: presentation sources, compiled deck, and presenter notes.
   `slides/slides.tex` is the Beamer entry point and includes the three
   `slides_*.tex` section files; `slides/slides.pdf` is the compiled deck.
@@ -251,6 +262,19 @@ latexmk -pdf -interaction=nonstopmode -halt-on-error \
 ```
 
 The paper, slide, and presenter-notes builds were last verified on 2026-07-13.
+
+The research draft has an embedded bibliography and no external figures or
+local TeX inputs.
+To build it diagnostically without writing build artifacts into the repository,
+run `pdflatex` twice to resolve its cross-references:
+
+```bash
+mkdir -p /private/tmp/tijana-research-draft/build
+pdflatex -interaction=nonstopmode -halt-on-error \
+  -output-directory=/private/tmp/tijana-research-draft/build working_draft.tex
+pdflatex -interaction=nonstopmode -halt-on-error \
+  -output-directory=/private/tmp/tijana-research-draft/build working_draft.tex
+```
 
 ## Data and Output Paths
 

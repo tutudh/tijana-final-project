@@ -1,0 +1,1273 @@
+% Independent research draft with embedded proofs and public references.
+% Development provenance and review status are recorded in the research docs.
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs,array,microtype}
+\usepackage{algorithm,algpseudocode}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\hypersetup{pdftitle={Online PAC Labeling with Joint Error and Cost Guarantees}}
+\AtBeginDocument{%
+ \setlength{\abovedisplayskip}{8pt plus 2pt minus 2pt}%
+ \setlength{\belowdisplayskip}{8pt plus 2pt minus 2pt}%
+}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{assumption}{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+\newcommand{\E}{\mathbb E}
+\newcommand{\Pp}{\mathbb P}
+\newcommand{\ind}{\mathbf 1}
+\newcommand{\KL}{D_{\mathrm{KL}}}
+\newcommand{\TV}{\operatorname{TV}}
+\newcommand{\Ber}{\operatorname{Ber}}
+\newcommand{\calR}{\mathcal R}
+\newcommand{\calH}{\mathcal H}
+\newcommand{\calF}{\mathcal F}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\clip}{\operatorname{clip}}
+\newcommand{\argmin}{\operatorname*{arg\,min}}
+\newcommand{\Reg}{\operatorname{Reg}}
+\newcommand{\rel}{\mathsf{release}}
+\newcommand{\defr}{\mathsf{defer}}
+\newcommand{\audit}{\mathsf{audit}}
+
+\begin{document}
+\begin{center}
+{\Large\bfseries Online PAC Labeling with Joint Error and Cost Guarantees\par}
+\medskip
+Selective expert feedback, constrained routing, and a matching cost exponent
+\end{center}
+
+\begin{abstract}
+We study online labeling with a cheap predictor and a costly, correct
+expert. Each expert query both prevents a released-label error and reveals
+feedback about the predictor; released model labels supply no feedback.
+The objective is to control cumulative released error while approaching
+the cost of an optimal feasible score-based policy. Under i.i.d. arrivals,
+a fixed predictor and score, and a known global Lipschitz bound on
+conditional model error, we propose one-sided barrier saddle routing
+(OBSR). It learns a possibly nonmonotone release policy and an error
+price from selectively revealed labels. We prove simultaneous
+high-probability bounds of order $\widetilde O(T^{2/3})$ on cumulative
+error excess and cost regret against all feasible Borel score policies.
+An explicit target-tightening condition gives nominal PAC error control
+with sublinear excess cost. A complementary information-theoretic
+construction yields a $T^{2/3}$ lower bound on a weighted cost--error
+tradeoff. Together, these results determine the minimax cost exponent,
+up to logarithmic factors, for a specified nominal-PAC class with failure
+probability $T^{-2}$. We provide explicit updates and complete proofs;
+empirical validation is left to future work.
+\end{abstract}
+
+\section{From error control to cost-efficient labeling}
+\label{sec:intro}
+
+Large-scale labeling combines inexpensive model predictions with costly
+expert judgments. A useful guarantee must address both the accuracy of
+the released labels and the cost of producing them. Sending every item
+to a correct expert trivially controls error; achieving that control
+while learning when the model can safely be used is the statistical
+problem. We ask whether an online learner can approach the cost of an
+optimal error-constrained policy when true labels are available only
+through paid expert queries.
+
+\paragraph{The optimization principle.}
+Let $S$ be an observed score and $m(s)$ the model's conditional error
+probability. A score policy releases the model label with probability
+$a(s)$ and otherwise uses the expert. With unit expert cost, its
+expected expert expenditure and released error are
+$\E[1-a(S)]$ and $\E[a(S)m(S)]$. The population oracle solves
+\begin{equation}
+ \inf_{a:[0,1]\to[0,1]}\E[1-a(S)]
+ \quad\text{subject to}\quad
+ \E[a(S)m(S)]\le\eps,
+ \label{eq:oracle-intro}
+\end{equation}
+where policies are Borel measurable. At a fixed error price
+$\lambda\ge0$, the Lagrangian integrand is
+$1+a(s)(\lambda m(s)-1)$. It favors release when $\lambda m(s)<1$
+and deferral when $\lambda m(s)>1$, with randomization possible at
+equality. This linear-programming interpretation explains the role of
+the price; it is a reformulation, not a novelty claim. The learner must
+estimate useful routing decisions without knowing $m$ or receiving
+unpaid labels. Moreover, a threshold in $m(s)$ need not be a threshold
+in $s$: the score need not be calibrated or monotone in actual error.
+
+\paragraph{Method and results.}
+OBSR learns release probabilities on score bins together with a dual
+error price. Its one-sided log barrier accommodates the
+inverse-probability feedback supplied by expert deferrals. A vanishing
+query floor maintains information while limiting exploration cost.
+The main results are a simultaneous finite-horizon error and cost
+guarantee (Theorem~\ref{thm:upper}), a sufficient condition for nominal
+error control (Corollary~\ref{cor:tightening}), and a lower bound for
+every adaptive learner in a specialized instance family
+(Theorem~\ref{thm:main}). Corollary~\ref{cor:minimax} connects the upper
+and lower results under a precisely defined nominal-PAC criterion.
+The comparator knows the population law but cannot inspect the current
+true label before deciding. All paid model and expert calls are counted.
+
+\paragraph{Relation to existing methods.}
+PAC labeling provides certification for a fixed finite pool, including
+multiple-model routing, learned uncertainty scores, and cost-sensitive
+variants~\cite{paclabels}. Its guarantees do not require an i.i.d.
+population or a smooth score--error relation. Our problem instead concerns
+sequential learning from paid feedback and cost regret against a population
+oracle. Learning to defer also optimizes the allocation of predictions
+between a model and an expert; consistent surrogate methods learn from
+labeled training data and can allow an imperfect expert~\cite{defer}.
+Their statistical target differs from a finite-horizon released-error
+constraint with online acquisition costs.
+
+Action-dependent label revelation is central to apple tasting and partial
+monitoring~\cite{partial}. Online optimization with stochastic constraints
+studies simultaneous objective regret and constraint
+violation~\cite{stochastic}, but its full-feedback formulation supplies
+constraint functions after each decision. Here that information must be
+estimated from the labels actually purchased. Log-barrier mirror
+descent~\cite{barrier} and adaptive squared-gradient scaling~\cite{adagrad}
+are established ingredients. Our results concern their combination with
+score approximation, selective feedback, and a common cost--error
+comparator; they do not claim these ingredients or cost-sensitive routing
+as new ideas. Section~\ref{sec:comparison} makes the comparison of
+information and guarantees explicit.
+
+\paragraph{Organization and prerequisites.}
+Section~\ref{sec:model} defines the information protocol, assumptions,
+and comparator. Section~\ref{sec:algorithm} gives the complete algorithm,
+and Sections~\ref{sec:upper-results}--\ref{sec:upper-proof} state and prove
+its guarantees. Section~\ref{sec:lower} gives the lower bound and minimax
+consequence, with the full construction in Appendix~\ref{app:cicat}.
+The proofs use conditional expectation, convex duality, and elementary
+concentration and information inequalities. The mirror-descent estimate
+and concentration bound needed for the upper result are proved below.
+We use $\widetilde O$ to suppress logarithmic factors; exact remainders
+and their parameter dependence are displayed in the theorems.
+
+\section{Stochastic model and population benchmark}
+\label{sec:model}
+
+\begin{assumption}[Fixed stochastic source]
+\label{ass:iid}
+The triples $(S_t,\widehat Y_t,Y_t)_{t=1}^T$ are i.i.d., with score
+$S_t\in[0,1]$ and zero--one model loss
+$L_t=\ind\{\widehat Y_t\ne Y_t\}$. The model and score mechanism are
+fixed before the stream. No expert labels outside the specified feedback
+protocol are available to the learner.
+\end{assumption}
+
+\begin{assumption}[Costs and safe expert]
+\label{ass:cost}
+Calling the model costs a known constant $c_M\in[0,1]$ on every round.
+An expert query costs one and returns the correct label $Y_t$.
+An audit-and-correct action has the same expert charge and an additional
+known cost $c_R\in[0,1]$ when the model label is wrong.
+\end{assumption}
+
+\begin{assumption}[Global score regularity]
+\label{ass:smooth}
+The conditional error $m(s)=\Pp(L_t=1\mid S_t=s)$ admits a version on
+$[0,1]$ with a known finite bound $L\ge0$ such that
+\begin{equation}
+ |m(s)-m(s')|\le L|s-s'|,\qquad s,s'\in[0,1].
+ \label{eq:smooth}
+\end{equation}
+\end{assumption}
+These assumptions describe a stationary labeling population and a reliable
+expert. They impose neither calibration $m(s)=s$, monotonicity of $m$,
+a score-density lower bound, nor conditions near an unknown optimal
+threshold. Distribution shift, online retraining of the source, and
+unrestricted changes to the score mechanism fall outside the theorem.
+Observed drift, expert disagreement, or large local error differences can
+challenge the assumptions; finite data alone do not certify a global
+Lipschitz bound without additional structure.
+
+\subsection{Information, losses, and costs}
+
+At round $t$, the learner first fixes its state from the past, pays $c_M$,
+and observes $(S_t,\widehat Y_t)$. It then chooses release, defer, or
+audit using observable information and fresh randomness independent of
+the current label. On release it outputs $\widehat Y_t$ and never
+observes $Y_t$. Both expert actions reveal $Y_t$ and output that label;
+an audited error is corrected. Only then is the state updated.
+Let $\calH_{t-1}$ denote the observable history and state before the
+current triple arrives. All initial-state and update kernels are fixed
+independently of the unknown distribution.
+
+For a general learner let $A_t\in\{\rel,\defr,\audit\}$ and
+$I_t=\ind\{A_t\ne\rel\}$. Its actual released loss and total cost are
+\begin{equation}
+ R_t=(1-I_t)L_t,\qquad \calR_T=\sum_t R_t,\qquad
+ C_T=c_MT+\sum_t\bigl(I_t+c_R\ind\{A_t=\audit\}L_t\bigr).
+ \label{eq:ledger}
+\end{equation}
+The latent counterfactual loss $L_t$, the released loss $R_t$, and any
+feedback estimate are different objects. In particular, a corrected label
+has $R_t=0$. The proposed algorithm routes using the score and history;
+the model prediction is used as the candidate output, not as an additional
+routing feature.
+
+\subsection{The comparator}
+
+For a Borel release probability $a:[0,1]\to[0,1]$, define
+\begin{equation}
+ r_P(a)=\E[a(S)m(S)],\qquad
+ c_P(a)=\E[1-a(S)],\qquad
+ d_0(\eps)=\inf_{a:\,r_P(a)\le\eps}c_P(a),
+ \label{eq:population}
+\end{equation}
+where the infimum is over such Borel functions. For $\eps\in(0,1]$,
+the benchmark is
+\begin{equation}
+ C_T^\star(\eps)=T\{c_M+d_0(\eps)\}.
+ \label{eq:population-benchmark}
+\end{equation}
+This policy may know the distribution, but cannot see the current true
+label before acting. It uses the same score and pays the same model and
+expert costs. Auditing is weakly dominated by direct deferral in this
+model: both actions reveal and release $Y_t$, but audit corrections can
+cost extra. Thus allowing audits does not lower this benchmark. Both
+learner and comparator call the model on every round; a policy that can
+skip this call is a different comparison problem.
+
+We seek a simultaneous fixed-horizon event on which
+\begin{equation}
+ \calR_T\le\eps T+o(T),\qquad
+ C_T\le C_T^\star(\eps)+o(T).
+ \label{eq:target}
+\end{equation}
+The benchmark cost is expected population cost, while $C_T$ and
+$\calR_T$ are realized quantities. Probabilities in the upper bound
+include both the i.i.d. data and the learner's coins.
+
+\section{One-sided barrier saddle routing}
+\label{sec:algorithm}
+
+Partition $[0,1]$ into $K$ equal bins, assigning a boundary to the bin on
+its right and including $1$ in the last bin. Write $b(s)$ for its bin.
+For an integer horizon $T\ge2$, choose $K\ge1$ and
+$\gamma\in[1/T,1)$. Maintain release probabilities
+$x_t\in\mathcal X_\gamma=[0,1-\gamma]^K$ and a price
+$\lambda_t\in[0,\Lambda]$, where
+\begin{equation}
+ \Lambda=\frac2\eps,\qquad
+ \bar\eps=\min\{1,\eps+L/K\},\qquad
+ \eta_x=\sqrt{\frac{K\log(1/\gamma)}{2(1+\Lambda^2)T}}.
+ \label{eq:tuning}
+\end{equation}
+The relaxed internal budget $\bar\eps$ pays for score discretization;
+it is accounted for explicitly in the final error bound. The reveal floor
+$\gamma$ is an algorithm choice, not an assumption on the population.
+
+At score $S_t$, let $z_t=x_{t,b_t}$, $b_t=b(S_t)$, and $q_t=1-z_t$.
+Draw $D_t\sim\Ber(q_t)$ independently of the latent label conditional
+on the past and current observation. If $D_t=1$, defer to the expert;
+otherwise release the model label. Form the computable estimator
+\begin{equation}
+ W_t=\begin{cases}L_t/q_t,&D_t=1,\\0,&D_t=0,\end{cases}
+ \qquad
+ g_t=e_{b_t}(-1+\lambda_tW_t),\qquad
+ h_t=z_tW_t-\bar\eps.
+\label{eq:feedback}
+\end{equation}
+Here $e_j$ is the $j$th standard basis vector of $\mathbb R^K$.
+Conditional on the past and score,
+$\E[W_t\mid\calH_{t-1},S_t]=m(S_t)$. Setting $W_t=0$ after release
+is computable and does not assert that the hidden error is zero.
+
+The population saddle objective on the bins is
+\begin{equation}
+ d(x)+\lambda(r(x)-\bar\eps),\qquad
+ d(x)=\E[1-x_{b(S)}],\quad r(x)=\E[x_{b(S)}m(S)].
+ \label{eq:binned-functionals}
+\end{equation}
+The vectors in \eqref{eq:feedback} estimate its primal and dual gradients.
+For the primal update use the one-sided log barrier and its Bregman divergence,
+\begin{equation}
+ \Psi(x)=-\sum_{j=1}^K\log(1-x_j),\qquad
+ D_\Psi(u,v)=\Psi(u)-\Psi(v)-\langle\nabla\Psi(v),u-v\rangle.
+ \label{eq:bregman}
+\end{equation}
+One mirror-descent step is
+\begin{equation}
+ x_{t+1}=\argmin_{x\in\mathcal X_\gamma}
+       \{\eta_x\langle g_t,x\rangle+D_\Psi(x,x_t)\}.
+ \label{eq:mirror}
+\end{equation}
+It changes only coordinate $b_t$. With
+$\clip_{[a,b]}(v)=\min\{b,\max\{a,v\}\}$, its exact solution is
+\begin{equation}
+ v_t=q_t^{-1}-\eta_xg_{t,b_t},\qquad
+ x_{t+1,b_t}=1-\frac1{\clip_{[1,1/\gamma]}(v_t)}.
+ \label{eq:scalar}
+\end{equation}
+Indeed the derivative of the scalar objective is $1/(1-x)-v_t$.
+This formula handles boundary and large-step cases without an optimization
+solver. The dual update is projected ascent with adaptive scaling:
+\begin{equation}
+ B_t=\sum_{u=1}^t h_u^2,\qquad
+ \eta_{\lambda,t}=\frac\Lambda{\sqrt{1+B_t}},\qquad
+ \lambda_{t+1}=\clip_{[0,\Lambda]}
+            (\lambda_t+\eta_{\lambda,t}h_t).
+ \label{eq:dual}
+\end{equation}
+
+\begin{algorithm}[tbp]
+\caption{OBSR: one-sided barrier saddle routing}
+\label{alg:obsr}
+\begin{algorithmic}[1]
+\Require $T,\eps,L,K,\gamma$; parameters from \eqref{eq:tuning}.
+\State Initialize $x_1=0\in\mathbb R^K$, $\lambda_1=0$, $B_0=0$.
+\For{$t=1,\ldots,T$}
+ \State Pay $c_M$ and observe $(S_t,\widehat Y_t)$; set $b_t=b(S_t)$.
+ \State Set $z_t=x_{t,b_t}$ and $q_t=1-z_t$; draw $D_t\sim\Ber(q_t)$.
+ \If{$D_t=1$}
+  \State Pay one, observe $Y_t$, output $Y_t$, set $W_t=\ind\{\widehat Y_t\ne Y_t\}/q_t$.
+ \Else
+  \State Output $\widehat Y_t$, observe no true label, and set $W_t=0$.
+ \EndIf
+ \State Form $g_{t,b_t}=-1+\lambda_tW_t$ and $h_t=z_tW_t-\bar\eps$.
+ \State Update coordinate $b_t$ by \eqref{eq:scalar}; leave all other coordinates unchanged.
+ \State Set $B_t=B_{t-1}+h_t^2$ and update $\lambda_{t+1}$ by \eqref{eq:dual}.
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+OBSR uses no separate audit action: every acquired label is an expert
+deferral, so $C_T=c_MT+\sum_tD_t$ and $R_t=(1-D_t)L_t$.
+Deferral supplies the counterfactual model loss needed for learning while
+ensuring a correct output on that round. After $O(K)$ initialization, the routing
+updates take $O(1)$ arithmetic per round and $O(K)$ memory, excluding
+model and expert calls. No score monotonicity is imposed on $x_t$.
+
+\section{Joint guarantees and parameter choice}
+\label{sec:upper-results}
+
+\begin{theorem}[Finite-horizon OBSR guarantee]
+\label{thm:upper}
+Under Assumptions~\ref{ass:iid}--\ref{ass:smooth}, let $T\ge2$ be an
+integer, $\eps\in(0,1]$, $\delta\in(0,1)$, $K\ge1$ an integer, and
+$1/T\le\gamma<1$. Define
+\begin{align}
+ \ell_T&=\log(16KT/\delta),\notag\\
+ H_T&=\sqrt{KT\ell_T}+\sqrt{T\ell_T/\gamma}+\ell_T/\gamma,\notag\\
+ G_T(\eps)&=100(1+\eps^{-1})^2H_T.
+ \label{eq:remainder}
+\end{align}
+Algorithm~\ref{alg:obsr} satisfies, simultaneously with probability at
+least $1-\delta$,
+\begin{equation}
+ \calR_T\le\eps T+\frac{LT}{K}+G_T(\eps),\qquad
+ C_T\le C_T^\star(\eps)+\gamma T+G_T(\eps).
+ \label{eq:upper}
+\end{equation}
+\end{theorem}
+
+\begin{corollary}[Balanced tuning]
+\label{cor:balanced}
+Take $K=\lceil T^{1/3}\rceil$ and $\gamma=T^{-1/3}$. On the event
+in Theorem~\ref{thm:upper},
+\begin{align}
+ \calR_T-\eps T&\le LT^{2/3}+\overline G_T,\notag\\
+ C_T-C_T^\star(\eps)&\le T^{2/3}+\overline G_T,\notag\\
+ \overline G_T
+ &=100(1+\eps^{-1})^2
+ \bigl[(1+\sqrt2)T^{2/3}\sqrt{\ell_T}+T^{1/3}\ell_T\bigr].
+ \label{eq:balanced}
+\end{align}
+For fixed $\eps,L$ and fixed or polynomially small $\delta$, both
+remainders are $O_{\eps,L}(T^{2/3}\sqrt{\log(T/\delta)})=o(T)$.
+The average released error is consequently at most
+$\eps+\widetilde O(T^{-1/3})$.
+\end{corollary}
+\begin{proof}
+Use $K\le2T^{1/3}$, $LT/K\le LT^{2/3}$, and substitute into
+\eqref{eq:remainder}. The $T^{1/3}\ell_T$ term is asymptotically
+smaller than $T^{2/3}\sqrt{\ell_T}$ for the stated confidence levels.
+\end{proof}
+
+The three terms in $H_T$ represent primal learning over $K$ bins,
+importance-weighted feedback variance, and its maximal magnitude.
+Discretization contributes $LT/K$ to error; the reveal floor contributes
+$\gamma T$ to cost. This makes the $T^{2/3}$ balance explicit.
+
+\subsection{Nominal PAC control by tightening the target}
+
+The bound in \eqref{eq:upper} targets $\eps$ with finite-sample slack.
+The following consequence explains when one can certify the requested
+nominal error while retaining the comparator at that requested target.
+
+\begin{corollary}[A sufficient condition for nominal error control]
+\label{cor:tightening}
+Fix a requested target $\eps\in(0,1]$ and the other parameters of
+Theorem~\ref{thm:upper}. Let
+\begin{equation}
+ \widehat G_T=100(1+2/\eps)^2H_T,\qquad
+ b_T=\frac{L}{K}+\frac{\widehat G_T}{T}.
+ \label{eq:tightening}
+\end{equation}
+If $b_T\le\eps/2$, run OBSR with internal target $e=\eps-b_T$,
+recomputing \eqref{eq:tuning} using $e$. Then, simultaneously with
+probability at least $1-\delta$,
+\begin{equation}
+ \calR_T\le\eps T,\qquad
+ C_T\le C_T^\star(\eps)+\gamma T+\widehat G_T+\frac{b_TT}{\eps}.
+ \label{eq:nominal}
+\end{equation}
+Under balanced tuning and fixed $\eps,L$, the condition eventually
+holds for fixed or polynomially small $\delta$, and the excess cost
+in \eqref{eq:nominal} is $\widetilde O(T^{2/3})$.
+\end{corollary}
+\begin{proof}
+Since $e\ge\eps/2$, $G_T(e)\le\widehat G_T$. Theorem~\ref{thm:upper}
+at target $e$ gives $\calR_T\le eT+LT/K+G_T(e)\le\eps T$.
+For any policy feasible at $\eps$, the scaled release probability
+$a_e=(e/\eps)a$ is feasible at $e$ and costs at most
+$c_P(a)+b_T/\eps$. Taking an infimizing sequence yields
+$C_T^\star(e)\le C_T^\star(\eps)+b_TT/\eps$.
+Apply the cost bound at $e$ and combine these inequalities.
+\end{proof}
+This is a sufficient finite-sample condition, not a promise of useful
+savings at practical horizons. The displayed constants are conservative.
+When the condition fails, always using the expert still ensures zero
+released error, but need not have sublinear cost regret.
+
+\subsection{Comparison with public frameworks}
+\label{sec:comparison}
+
+\begin{center}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.20\textwidth}
+                  >{\raggedright\arraybackslash}p{0.35\textwidth}
+                  >{\raggedright\arraybackslash}p{0.38\textwidth}@{}}
+\toprule
+Framework & Data and feedback & Guarantee or optimization target\\
+\midrule
+PAC labels~\cite{paclabels} & Fixed finite pool; randomized expert sampling;
+no score-quality assumption & High-probability control of pool-average
+label loss; includes cost-sensitive routing.\\[5pt]
+Learning to defer~\cite{defer} & I.i.d. labeled training data with expert
+predictions; expert may err & Consistent surrogate estimation of the
+expected loss of a classifier--expert system.\\[5pt]
+Stochastic constraints~\cite{stochastic} & Online decisions; objective and
+constraint functions revealed afterward; feasibility assumptions &
+Objective regret and cumulative constraint violation relative to an
+expected-feasible comparator.\\[5pt]
+Partial monitoring~\cite{partial} & Sequential actions; feedback depends
+on action and outcome & Unconstrained loss regret against the best fixed
+action in hindsight.\\[5pt]
+OBSR (this work) & I.i.d. stream; known Lipschitz bound; true labels
+revealed only by paid, correct expert & Joint realized error and cost bounds
+against all feasible score policies; nominal error via target tightening.\\
+\bottomrule
+\end{tabular}
+\end{center}
+The comparison is between mathematical formulations, not measured
+performance. A fixed-pool certificate and a population regret bound
+answer different questions, and the full-feedback stochastic-constraint
+theorem cannot be applied directly to selectively observed labels.
+Likewise, an unconstrained partial-monitoring rate does not establish
+the cost lower bound in Section~\ref{sec:lower}. The OBSR guarantee permits
+nonmonotone score policies, but requires stationarity, score regularity,
+and a correct expert. We do not infer a uniform rate improvement over
+these public methods from guarantees with different assumptions.
+
+\section{Proof of the OBSR guarantee}
+\label{sec:upper-proof}
+
+For the analysis, let $\calF_t$ contain all triples and learner coins
+through round $t$, including labels that were never revealed, and set
+$\E_{t-1}=\E[\,\cdot\mid\calF_{t-1}]$. The observable history
+satisfies $\calH_t\subseteq\calF_t$; the learner still uses only
+$\calH_{t-1}$ and the permitted current observation. The state
+$(x_t,\lambda_t)$ is $\calF_{t-1}$-measurable, and i.i.d. arrivals
+and fresh coins give the conditional means below under this enlarged
+filtration. In particular, $R_t-\E_{t-1}R_t$ is now an adapted
+martingale difference although an unrevealed $R_t$ is not observable.
+Write $\mathcal X_\gamma=[0,1-\gamma]^K$ and let
+\begin{equation}
+ d_\gamma^\star=\min_{x\in\mathcal X_\gamma:\ r(x)\le\bar\eps}d(x).
+ \label{eq:binned-lp}
+\end{equation}
+An optimum exists by compactness and the safe policy $x=0$.
+
+\begin{lemma}[Discretization and the safe-action multiplier]
+\label{lem:coarsening}
+We have $d_\gamma^\star\le d_0(\eps)+\gamma$. There is an optimal
+multiplier $0\le\lambda^\star\le1/\bar\eps\le1/\eps$ such that
+\begin{equation}
+ d(x)-d_\gamma^\star+\lambda^\star(r(x)-\bar\eps)\ge0
+ \quad\text{for every }x\in\mathcal X_\gamma.
+ \label{eq:exact-penalty}
+\end{equation}
+\end{lemma}
+\begin{proof}
+For any feasible Borel comparator $a$, define
+$u_j=\E[a(S)\mid S\text{ in bin }j]$, setting it to zero on null bins,
+and $\mu_j=\E[m(S)\mid S\text{ in bin }j]$ on positive-mass bins.
+Conditional averaging preserves release mass. In each such bin,
+\[
+ u_j\mu_j-\E[a(S)m(S)\mid j]
+ =\E[a(S)(\mu_j-m(S))\mid j]\le L/K.
+\]
+Summing with bin probabilities gives $r(u)\le\eps+L/K$; also
+$r(u)\le1$, so $r(u)\le\bar\eps$. The vector
+$u^\gamma=(1-\gamma)u$ lies in $\mathcal X_\gamma$, remains feasible,
+and has $d(u^\gamma)\le c_P(a)+\gamma$. An infimizing sequence gives
+the first conclusion without assuming a Borel minimizer exists.
+
+Finite-dimensional LP duality yields an optimal $\lambda^\star\ge0$
+for \eqref{eq:binned-lp}; strict feasibility follows from a sufficiently
+small positive vector. Its dual identity gives \eqref{eq:exact-penalty}.
+Evaluating the dual objective at $x=0$ gives
+$0\le d_\gamma^\star\le1-\lambda^\star\bar\eps$, hence the bound.
+\end{proof}
+
+\begin{lemma}[Pathwise primal and dual regret]
+\label{lem:regret}
+If $K\log(1/\gamma)\le T/4$, then, for every $x\in\mathcal X_\gamma$,
+\begin{equation}
+ \sum_t\langle g_t,x_t-x\rangle
+ \le A_x:=2\sqrt{2(1+\Lambda^2)KT\log(1/\gamma)}.
+ \label{eq:primal-regret}
+\end{equation}
+For every $\lambda\in[0,\Lambda]$, without this restriction,
+\begin{equation}
+ \sum_t h_t(\lambda-\lambda_t)
+ \le A_\lambda:=\frac32\Lambda\sqrt{1+\sum_t h_t^2}.
+ \label{eq:dual-regret}
+\end{equation}
+\end{lemma}
+\begin{proof}
+The key barrier cancellation is
+\begin{equation}
+ q_tg_{t,b_t}=-q_t+\lambda_tD_tL_t,\qquad
+ q_t^2g_{t,b_t}^2\le2(1+\Lambda^2).
+ \label{eq:cancellation}
+\end{equation}
+For the active coordinate, put $q=1-x_{t,b_t}$,
+$\alpha=\eta_xqg_{t,b_t}$ and
+$v=(x_{t+1,b_t}-x_{t,b_t})/q$. The assumed condition ensures
+$|\alpha|\le1/2$. Mirror-descent optimality and the three-point
+Bregman identity imply
+\begin{align*}
+ \eta_x\langle g_t,x_t-x\rangle
+ &\le D_\Psi(x,x_t)-D_\Psi(x,x_{t+1})
+       +\eta_x\langle g_t,x_t-x_{t+1}\rangle
+       -D_\Psi(x_{t+1},x_t)\\
+ &\le D_\Psi(x,x_t)-D_\Psi(x,x_{t+1})
+       +\sup_{v<1}\{-\alpha v+\log(1-v)+v\}\\
+ &=D_\Psi(x,x_t)-D_\Psi(x,x_{t+1})
+       -\log(1-\alpha)-\alpha\\
+ &\le D_\Psi(x,x_t)-D_\Psi(x,x_{t+1})+\alpha^2.
+\end{align*}
+The last scalar inequality holds for $|\alpha|\le1/2$.
+Since $D_\Psi(x,0)=\sum_j[-\log(1-x_j)-x_j]\le K\log(1/\gamma)$,
+telescoping and \eqref{eq:cancellation} give
+\[
+ \sum_t\langle g_t,x_t-x\rangle
+ \le K\log(1/\gamma)/\eta_x+2\eta_x(1+\Lambda^2)T=A_x.
+\]
+For the dual step, nonexpansiveness of projection gives
+\[
+ h_t(\lambda-\lambda_t)
+ \le\frac{(\lambda-\lambda_t)^2-(\lambda-\lambda_{t+1})^2}
+              {2\eta_{\lambda,t}}
+       +\frac{\eta_{\lambda,t}h_t^2}{2}.
+\]
+The step sizes decrease. Summation by parts bounds the first sum by
+$\Lambda\sqrt{1+B_T}/2$; the second is at most
+$\Lambda(\sqrt{1+B_T}-1)$, using
+\[
+ \frac{B_t-B_{t-1}}{\sqrt{1+B_t}}
+ \le2(\sqrt{1+B_t}-\sqrt{1+B_{t-1}}).
+\]
+This proves \eqref{eq:dual-regret}.
+\end{proof}
+
+\begin{lemma}[Martingale concentration]
+\label{lem:bernstein}
+If $(\xi_t)$ are martingale differences with $|\xi_t|\le b$ and
+$\sum_t\E_{t-1}\xi_t^2\le V$ for deterministic $V$, then
+\begin{equation}
+ \Pp\left\{\sum_t\xi_t>\sqrt{2Vs}+bs/3\right\}\le e^{-s},
+ \qquad s>0.
+ \label{eq:bernstein}
+\end{equation}
+The same bound applies to the negative sum.
+\end{lemma}
+\begin{proof}
+For $0<\theta<3/b$, expanding the conditional exponential gives
+\[
+ \E_{t-1}e^{\theta\xi_t}
+ \le\exp\left\{\frac{\theta^2\E_{t-1}\xi_t^2}{2(1-\theta b/3)}\right\}.
+\]
+Iteration bounds the moment-generating function of the sum by
+$\exp\{V\theta^2/[2(1-\theta b/3)]\}$.
+For $V>0$, exponential Markov with
+$\theta=\sqrt{2s/V}/(1+(b/3)\sqrt{2s/V})$ gives \eqref{eq:bernstein}.
+If $V=0$, all differences vanish almost surely.
+\end{proof}
+
+\begin{lemma}[A coupled population saddle bound]
+\label{lem:saddle}
+Suppose $K\log(1/\gamma)\le T/4$ and let $x^\star$ attain
+\eqref{eq:binned-lp}. Write
+\[
+ U_T=\sum_t[d(x_t)-d_\gamma^\star],\qquad
+ V_T=\sum_t[r(x_t)-\bar\eps].
+\]
+On a common event of probability at least $1-\delta$,
+\begin{equation}
+ U_T+\lambda V_T\le25\eps^{-1}H_T\quad(\lambda=0,\Lambda),
+ \qquad U_T\le25\eps^{-1}H_T,\quad (V_T)_+\le25H_T.
+ \label{eq:saddle}
+\end{equation}
+The event can also include
+\begin{equation}
+ \sum_tD_t\le\sum_td(x_t)+J_T,\qquad
+ \calR_T\le\sum_tr(x_t)+J_T,\qquad
+ J_T=\sqrt{2T\ell_T}+\ell_T/3.
+ \label{eq:realized}
+\end{equation}
+\end{lemma}
+\begin{proof}
+Adding \eqref{eq:primal-regret} and \eqref{eq:dual-regret} yields
+\begin{equation}
+ \sum_t[-z_t+x^\star_{b_t}+\lambda(z_tW_t-\bar\eps)]
+ \le A_x+A_\lambda+N_T,\qquad
+ N_T=\sum_t\lambda_t(x^\star_{b_t}W_t-\bar\eps).
+ \label{eq:pathwise-saddle}
+\end{equation}
+Importance weighting and i.i.d. sampling give
+$\E_{t-1}z_tW_t=r(x_t)$ and
+$\E_{t-1}x^\star_{b_t}W_t=r(x^\star)\le\bar\eps$.
+Define
+\[
+ M_0=\sum_t[x^\star_{b_t}-z_t-\E_{t-1}(x^\star_{b_t}-z_t)],
+ \qquad M_r=\sum_t[z_tW_t-r(x_t)].
+\]
+The left side of \eqref{eq:pathwise-saddle} is
+$U_T+\lambda V_T+M_0+\lambda M_r$.
+The adaptive multiplier must stay inside $N_T$: its nonpositive
+conditional drift follows from past-measurability of $\lambda_t$ and
+feasibility of $x^\star$.
+
+The moment calculations use $0\le W_t\le1/\gamma$ and
+$\E[W_t^k\mid\calF_{t-1},S_t]\le q_t^{1-k}$ for $k\ge1$.
+They give
+\begin{align*}
+ |h_t|&\le1/\gamma,&
+ \E_{t-1}h_t^2&\le4/\gamma,&
+ \E_{t-1}h_t^4&\le4/\gamma^3,\\
+ |z_tW_t-r(x_t)|&\le1/\gamma,&
+ \operatorname{Var}_{t-1}(z_tW_t)&\le1/\gamma.
+\end{align*}
+For $X_t=\lambda_t(x^\star_{b_t}W_t-\bar\eps)$,
+$\E_{t-1}X_t\le0$, $\E_{t-1}X_t^2\le4\Lambda^2/\gamma$,
+and $|X_t-\E_{t-1}X_t|\le2\Lambda/\gamma$.
+Applying Lemma~\ref{lem:bernstein}, with $s=\ell_T$, gives the
+following simultaneous bounds:
+\begin{align}
+ |M_0|&\le\sqrt{2T\ell_T}+2\ell_T/3,\notag\\
+ |M_r|&\le\sqrt{2T\ell_T/\gamma}+\ell_T/(3\gamma),\notag\\
+ N_T&\le\Lambda\sqrt{8T\ell_T/\gamma}
+                      +2\Lambda\ell_T/(3\gamma),\notag\\
+ \sum_th_t^2&\le4T/\gamma+\sqrt{8T\ell_T/\gamma^3}
+                                 +\ell_T/(3\gamma^2).
+ \label{eq:concentration-list}
+\end{align}
+For the last line, apply concentration to
+$h_t^2-\E_{t-1}h_t^2$, whose range is bounded by $1/\gamma^2$
+and conditional variance by $4/\gamma^3$. The two inequalities
+in \eqref{eq:realized} follow because $D_t,R_t\in[0,1]$ have
+conditional means $d(x_t),r(x_t)$. Counting the two tails for each
+absolute value, there are eight tails in total. Their failure probability
+is at most $8e^{-\ell_T}=\delta/(2KT)\le\delta$.
+
+Put $P_T=\sqrt{KT\ell_T}$, $F_T=\sqrt{T\ell_T/\gamma}$, and
+$Q_T=\ell_T/\gamma$, so $H_T=P_T+F_T+Q_T$.
+Since $T\gamma\ge1$ and $\ell_T\ge1$,
+\eqref{eq:concentration-list} implies
+$\sqrt{1+\sum_th_t^2}\le5F_T+Q_T$.
+Also $\log(1/\gamma)\le\ell_T$.
+Substitution in \eqref{eq:pathwise-saddle}, using
+$\Lambda=2/\eps$ and $\eps^{-1}\ge1$, bounds the coefficients
+of $P_T,F_T,Q_T$ by $25\eps^{-1}$ for both $\lambda=0,\Lambda$.
+This proves the first inequality in \eqref{eq:saddle}.
+
+Finally, summing \eqref{eq:exact-penalty} at $x_t$ gives
+$U_T+\lambda^\star V_T\ge0$. If $V_T>0$, the case $\lambda=\Lambda$
+therefore yields
+\[
+ (\Lambda-\lambda^\star)V_T\le25\eps^{-1}H_T,
+ \qquad \Lambda-\lambda^\star\ge1/\eps.
+\]
+This bounds $(V_T)_+$; the case $\lambda=0$ bounds $U_T$.
+\end{proof}
+
+\begin{proof}[Proof of Theorem~\ref{thm:upper}]
+In the stable regime $K\log(1/\gamma)\le T/4$, use the common
+event in Lemma~\ref{lem:saddle}. Then
+\[
+ \calR_T\le\bar\eps T+25H_T+J_T
+ \le\eps T+LT/K+G_T(\eps).
+\]
+Similarly, by Lemma~\ref{lem:coarsening},
+\[
+ C_T\le c_MT+Td_\gamma^\star+25\eps^{-1}H_T+J_T
+ \le C_T^\star(\eps)+\gamma T+G_T(\eps).
+\]
+The coefficient $100(1+\eps^{-1})^2$ bounds all the displayed
+remainders. Both sides include the same $c_MT$; neither the algorithm
+nor an optimal comparator incurs audit correction charges.
+
+If $K\log(1/\gamma)>T/4$, then
+$\sqrt{KT\ell_T}>T/2$ and $G_T(\eps)\ge T$.
+The deterministic bounds $\calR_T\le T$ and
+$C_T-C_T^\star(\eps)\le T$ establish \eqref{eq:upper}.
+This is a proof case; the scalar update \eqref{eq:scalar} remains
+well-defined and the algorithm does not switch policies.
+\end{proof}
+
+\section{A complementary lower bound}
+\label{sec:lower}
+
+We now specialize the same model to binary labels, the constant predictor
+$\widehat Y_t=0$, costs $c_M=c_R=0$, risk budget $\eps=1/4$, and
+Lipschitz bound $L=1$. Thus $L_t=Y_t$, $C_T=\sum_tI_t$, and
+$\calR_T=\sum_t(1-I_t)Y_t$. The lower bound allows every adaptive
+release/defer/audit learner, not only binned policies or OBSR. Its initial
+state and randomness cannot depend on the unknown instance. For an
+instance $P_\theta$, abbreviate the same population benchmark by
+\begin{equation}
+ C^\star_{\theta,T}
+ =T\inf_{a:\,\E_\theta[a(S)m_\theta(S)]\le1/4}
+                \E_\theta[1-a(S)].
+ \label{eq:benchmark}
+\end{equation}
+The infimum is again over all Borel $a:[0,1]\to[0,1]$. The following
+construction is called CICAT (Camouflaged Independent-Cell Apple Tasting).
+
+\begin{theorem}[CICAT cost--error lower bound]
+\label{thm:main}
+For every integer $T\ge8$, there is a finite family
+$\{P_\theta:\theta\in\Theta_T\}$ satisfying the specialized model in Section~\ref{sec:lower}, with
+$\Theta_T=\{-1,+1\}^{\lfloor T^{1/3}\rfloor}$, such that every admissible
+randomized adaptive learner satisfies
+\begin{equation}
+ \max_{\theta\in\Theta_T}
+ \left\{
+  \E_\theta C_T-C^\star_{\theta,T}
+  +2\left(\E_\theta\calR_T-\frac T4\right)
+ \right\}
+ \ge \frac{T^{2/3}}{2048}.
+ \label{eq:main}
+\end{equation}
+Here $C^\star_{\theta,T}=C^\star_{P_\theta,T}(1/4)$, and $\E_\theta$ includes
+the arrivals, labels, and learner randomization. The learner may know $T$,
+the score marginal, and the entire family, but not the unknown $\theta$.
+Every instance has an optimal comparator with risk exactly $1/4$.
+\end{theorem}
+
+\begin{corollary}[Cost lower bound under controlled error slack]
+\label{cor:cost}
+If a learner satisfies
+\begin{equation}
+ \E_\theta\calR_T\le\frac T4+\frac{T^{2/3}}{8192}
+ \qquad\text{for every }\theta\in\Theta_T,
+ \label{eq:slack}
+\end{equation}
+then, on at least one instance,
+\begin{equation}
+ \E_\theta C_T-C^\star_{\theta,T}\ge\frac{T^{2/3}}{4096}.
+ \label{eq:cost-lower}
+\end{equation}
+\end{corollary}
+\begin{proof}
+Choose an instance attaining the maximum in \eqref{eq:main} and subtract
+twice the error excess. Equations \eqref{eq:main}--\eqref{eq:slack} give
+$\E_\theta C_T-C^\star_{\theta,T}
+\ge(1/2048-2/8192)T^{2/3}=T^{2/3}/4096$.
+\end{proof}
+
+The proof in Appendix~\ref{app:cicat} constructs the family, identifies
+its binding optimal comparator, and bounds the information available to
+any adaptive learner. The signed error excess in \eqref{eq:main} is
+essential: the theorem alone is not a cost lower bound for a learner
+allowed arbitrary error slack.
+
+\subsection{A precise optimality consequence for nominal PAC labeling}
+
+Target tightening permits a common comparison criterion for the upper and
+lower results. The following definition fixes both the error requirement
+and the comparator before comparing their rates.
+Let $\mathcal P_1$ be the fixed class of all i.i.d. laws of
+$(S,Y)\in[0,1]\times\{0,1\}$ with a globally one-Lipschitz version
+of $\Pp(Y=1\mid S=s)$. Fix $\widehat Y\equiv0$, $c_M=c_R=0$,
+unit expert cost, and $\eps=1/4$. For horizon $T$, define
+\begin{align}
+ \mathcal A_T^{\mathrm{PAC}}
+ &=\left\{\mathcal A:
+    \sup_{P\in\mathcal P_1}\Pp_P(\calR_T>T/4)\le T^{-2}\right\},
+ \notag\\
+ \mathfrak M_T
+ &=\inf_{\mathcal A\in\mathcal A_T^{\mathrm{PAC}}}
+   \sup_{P\in\mathcal P_1}
+      \{\E_P C_T-C_{P,T}^\star(1/4)\}.
+ \label{eq:minimax-definition}
+\end{align}
+The learners obey the information protocol and are fixed independently of
+the unknown $P$; they may know the class and horizon. The class is
+nonempty because always using the expert is admissible.
+
+\begin{corollary}[Minimax exponent in a nominal-PAC class]
+\label{cor:minimax}
+There are universal constants $C<\infty$ and $T_0$ such that, for all
+integers $T\ge T_0$,
+\begin{equation}
+ \frac{T^{2/3}}{4096}\le\mathfrak M_T
+       \le C T^{2/3}\sqrt{\log T}.
+ \label{eq:minimax}
+\end{equation}
+\end{corollary}
+\begin{proof}
+For any $\mathcal A\in\mathcal A_T^{\mathrm{PAC}}$, bounded loss gives
+$\E_P\calR_T\le T/4+T\cdot T^{-2}=T/4+T^{-1}$, uniformly in $P$.
+The finite CICAT family is contained in the fixed class $\mathcal P_1$.
+For all sufficiently large $T$, $T^{-1}\le T^{2/3}/8192$, so
+Corollary~\ref{cor:cost} gives the lower bound for each admissible
+learner and hence for their infimum.
+
+For the upper bound, take the tightened OBSR procedure in
+Corollary~\ref{cor:tightening}, with $\eps=1/4$, $L=1$,
+$\delta=T^{-2}$, $K=\lceil T^{1/3}\rceil$, and $\gamma=T^{-1/3}$.
+Its finite-sample condition holds for all sufficiently large $T$,
+uniformly over $\mathcal P_1$. It therefore belongs to
+$\mathcal A_T^{\mathrm{PAC}}$ and has a uniform high-probability
+cost gap $O(T^{2/3}\sqrt{\log T})$.
+On the failure event, $C_T-C_{P,T}^\star(1/4)\le T$; taking
+expectations adds at most $T^{-1}$. Taking the supremum over $P$
+establishes the upper bound.
+\end{proof}
+
+This establishes the exponent for the specific criterion
+\eqref{eq:minimax-definition}, up to a square-root logarithmic factor.
+It does not characterize every error--cost tradeoff or imply the same
+cost lower bound when failure probability is fixed, error slack is
+larger, or the score regularity and comparator class change. In
+particular, a fixed failure probability would contribute $O(T)$ in
+the expectation conversion used above.
+
+\section{Scope and empirical evaluation}
+\label{sec:research}
+
+\paragraph{Practical scope of the theory.}
+OBSR learns a routing policy for a fixed predictor and score. Its bounds
+apply to realized deployment costs and released errors, with expert
+queries supplying all online label feedback. They do not provide a
+guarantee for an adaptive pipeline that also retrains the predictor or
+score on those labels. The nominal-PAC and minimax conclusions depend
+on the explicit tightening condition and expectation conversion above.
+The theorem constants may be too conservative to justify savings at
+available dataset sizes. Sharper finite-sample analysis remains valuable
+even if the asymptotic exponent is settled for this model.
+
+\subsection{A fully specified calibration baseline}
+
+For a population-stream comparison, consider a calibrated threshold
+baseline inspired by PAC labeling~\cite{paclabels}. The following
+independent-sample construction has its own deployment certificate;
+it is not the published fixed-pool algorithm. Fix the predictor and score
+before drawing $n\ge1$ calibration pairs $(S'_i,L'_i)$ i.i.d. from the
+same law of $(S,L)$ as the deployment stream, independently of that stream.
+For $j=0,\ldots,200$, let $a_j(s)=\ind\{s\le j/200\}$ and define
+\begin{equation}
+ \widehat r_j=\frac1n\sum_{i=1}^n a_j(S'_i)L'_i,\qquad
+ u_n=\sqrt{\frac{\log(402/\delta)}{2n}},\qquad
+ v_T=\sqrt{\frac{\log(2/\delta)}{2T}}.
+ \label{eq:calibration-baseline}
+\end{equation}
+Choose the largest $j$ with $\widehat r_j+u_n+v_T\le\eps$.
+If none exists, use the expert-only policy $a\equiv0$, whose risk is
+known to be zero. Freeze the selected policy and deploy it on an
+independent stream of $T$ items. The largest feasible threshold minimizes
+expert usage among the certified thresholds because their release sets
+are nested, regardless of whether $m$ is monotone.
+
+For completeness, Hoeffding's inequality and a union bound over 201
+thresholds give $r_P(a_j)\le\widehat r_j+u_n$ for every $j$ with
+probability at least $1-\delta/2$. Conditional on calibration, a second
+Hoeffding bound gives deployment average released error at most
+$r_P(a_j)+v_T$ with probability at least $1-\delta/2$. Thus this
+baseline satisfies $\Pp(\calR_T\le\eps T)\ge1-\delta$; the
+expert-only fallback is safe deterministically. This certificate controls
+error, but supplies no regret guarantee against all Borel score policies.
+Its threshold restriction can exclude useful policies when $m$ is
+nonmonotone. Charge $n(1+c_M)$ for calibration in addition to deployment
+cost; report both quantities. An end-to-end comparison must also disclose
+any labels used to train the fixed predictor or score.
+
+\subsection{Proposed validation protocol}
+
+No empirical OBSR result is claimed in this draft. A first comparison
+should include balanced OBSR, its tightened variant when the sufficient
+condition holds, the baseline in \eqref{eq:calibration-baseline}, and
+always-expert labeling. The distribution-aware score-policy optimum is
+an evaluation-only oracle. A separate batch study can compare the
+published PAC-labeling procedure~\cite{paclabels} under its fixed-pool
+protocol. Report the difference in pool access and use a common ledger
+for all incurred model calls and expert queries; its finite-pool
+certificate must be interpreted in that sampling model.
+
+For a synthetic correctness study, draw i.i.d. scores
+$S_t\sim\mathrm{Uniform}[0,1]$, then conditionally independently draw
+$Y_t\mid S_t\sim\Ber(m(S_t))$, with $\widehat Y_t=0$.
+Use $m(s)=0.05+0.4s$ and
+$m(s)=0.05+0.4(2s-1)^2$, whose Lipschitz bounds are $0.4$ and $1.6$.
+These are synthetic mechanisms with known oracle risks, not real model
+evidence. A reproducible initial sweep would use
+$T\in\{2^{10},2^{12},2^{14},2^{16},2^{18}\}$,
+$\eps\in\{0.05,0.10,0.15\}$, $\delta=0.05$, and 500 trials
+with seed $20260908+r$ for trial $r=0,\ldots,499$; methods share each
+trial's stream and use separate routing random-number streams.
+Use $n=\lceil0.2T\rceil$ for the independent calibration baseline and
+the threshold grid and confidence allocation in
+\eqref{eq:calibration-baseline}. This fixed calibration fraction is a
+benchmark choice, not a sublinear-cost claim. Use $c_M\in\{0,0.05\}$,
+$c_R=0$, and unit expert cost. OBSR uses the displayed balanced parameters
+without oracle tuning. Record whether the target-tightening condition
+holds at each horizon; if it fails, report that fact and the safe
+expert-only fallback separately from the tightened method's cost bound.
+
+Report actual released error, latent counterfactual model error used
+only for evaluation, expert-query frequency, all cost components, and
+gap to the same oracle comparator. Report violations both at nominal
+$\eps$ and at the theorem's stated finite-horizon bound. For a real
+benchmark, use independent held-out examples from genuine model
+prediction tables. Repeated permutations of a fixed dataset do not
+reproduce i.i.d. sampling conditional on that dataset; distinguish
+such finite-dataset stress tests from the theorem's sampling model.
+Distribution-shift studies must likewise be labeled outside the proven
+stationary setting. A multi-source extension requires genuine distinct
+models and a new theorem for its observation and cost structure.
+
+\paragraph{Remaining research obligations.}
+Independent proof review, a broader novelty audit against the public
+literature, and an implementation with reproducible empirical validation
+remain necessary before submission. Investigate
+whether confidence-adaptive querying or sharper concentration improves
+finite-sample cost while retaining nominal error control. Unknown
+Lipschitz bounds, changing scores, multiple costly sources, and imperfect
+experts require additional analysis; they are not covered by the results
+above.
+
+\appendix
+
+\section{Proof of the CICAT lower bound}
+\label{app:cicat}
+\subsection{The finite family}
+\label{sec:family}
+
+Fix $T\ge8$ and set
+\begin{equation}
+ M=\lfloor T^{1/3}\rfloor,\qquad
+ \beta=\frac1{64(M+1)},\qquad
+ \bar\theta=\frac1M\sum_{i=1}^M\theta_i,\qquad
+ s_i=\frac12+\frac{i}{2(M+1)}.
+ \label{eq:parameters}
+\end{equation}
+Here $\beta$ is a signal gap, not a failure probability. We have
+$M\ge2$ and $\beta\le1/192$. The score marginal is the same for all
+$\theta\in\{-1,+1\}^M$, and the conditional law is
+$Y\mid S=s\sim\Ber(m_\theta(s))$, with
+\begin{center}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Score & Probability & Conditional error $m_\theta(s)$\\
+\midrule
+$0$ (anchor) & $1/4$ & $1/8-\beta\bar\theta$\\[2pt]
+$1/2$ (boundary) & $1/2$ & $1/2$\\[2pt]
+$s_i$, $i=1,\ldots,M$ & $1/(4M)$ & $1/2+\theta_i\beta$\\
+\bottomrule
+\end{tabular}
+\end{center}
+Between consecutive support points, extend $m_\theta$ by linear
+interpolation, and keep it constant on $[s_M,1]$. Draw the $T$ pairs
+independently from this law. This is a constructed lower-bound family,
+not an empirical dataset.
+
+\begin{lemma}[Admissibility and common marginals]
+\label{lem:family}
+Every $P_\theta$ satisfies \eqref{eq:smooth} with $L=1$. The score marginal, the
+model output, and the marginal label law are identical across the family;
+in particular, $\E_\theta Y=13/32$.
+\end{lemma}
+\begin{proof}
+The probabilities sum to one, and all conditional means lie in $(0,1)$.
+The interpolation slope on $[0,1/2]$ is
+$3/4+2\beta\bar\theta$, whose absolute value is less than one.
+On $[1/2,s_1]$ its absolute value is $2\beta(M+1)=1/32$;
+between successive $s_i$ it is at most $4\beta(M+1)=1/16$;
+after $s_M$ it is zero. Hence the continuous extension is globally
+one-Lipschitz. Finally,
+\[
+ \E_\theta Y
+ =\frac14\left(\frac18-\beta\bar\theta\right)
+  +\frac1{4M}\sum_{i=1}^M\left(\frac12+\theta_i\beta\right)
+  +\frac12\cdot\frac12
+ =\frac{13}{32}.
+\]
+Since $Y$ is binary, its marginal law is therefore common as well.
+\end{proof}
+
+\subsection{Optimal comparator and the cost--error decomposition}
+
+Let $n_-=\#\{i:\theta_i=-1\}=M(1-\bar\theta)/2$ and define
+\begin{align}
+ r_\theta
+ &=\frac14\left(\frac18-\beta\bar\theta\right)
+   +\frac{n_-}{4M}\left(\frac12-\beta\right)\notag\\
+ &=\frac3{32}-\frac\beta8
+   -\bar\theta\left(\frac1{16}+\frac\beta8\right),
+ \qquad \alpha_\theta=1-4r_\theta.
+ \label{eq:boundary-mix}
+\end{align}
+Define $a^\star_\theta$ on the support by
+\begin{equation}
+ a^\star_\theta(0)=1,\qquad
+ a^\star_\theta(1/2)=\alpha_\theta,\qquad
+ a^\star_\theta(s_i)=\ind\{\theta_i=-1\},
+ \label{eq:comparator}
+\end{equation}
+and extend it as a Borel function, for example by setting it to zero off
+the support.
+
+\begin{lemma}[Optimality and excess objective]
+\label{lem:comparator}
+The policy $a^\star_\theta$ is optimal in \eqref{eq:benchmark}, has risk
+exactly $1/4$, and satisfies
+\begin{equation}
+ C^\star_{\theta,T}
+ =T\left(\frac5{16}-\frac\beta4(1+\bar\theta)\right).
+ \label{eq:explicit-cost}
+\end{equation}
+For any learner, set
+\begin{align}
+ \Delta_\theta
+ &=\E_\theta C_T-C^\star_{\theta,T}
+   +2(\E_\theta\calR_T-T/4),\label{eq:priced-gap}\\
+ W_i
+ &=\sum_{t=1}^T\ind\{S_t=s_i\}
+   \bigl(\ind\{\theta_i=-1\}I_t
+        +\ind\{\theta_i=+1\}(1-I_t)\bigr).
+ \label{eq:wrong-actions}
+\end{align}
+Then
+\begin{equation}
+ \Delta_\theta\ge2\beta\sum_{i=1}^M\E_\theta W_i.
+ \label{eq:decomposition}
+\end{equation}
+\end{lemma}
+\begin{proof}
+Equation \eqref{eq:boundary-mix} gives
+$1/32-\beta/4\le r_\theta\le5/32$, so $0<r_\theta<1/4$
+and $0<\alpha_\theta<1$. The anchor and negative cells contribute risk
+$r_\theta$, and the boundary contributes $\alpha_\theta/4$.
+Thus $r_{P_\theta}(a^\star_\theta)=1/4$. Its deferral probability is
+$(M-n_-)/(4M)+(1-\alpha_\theta)/2$; simplifying yields
+\eqref{eq:explicit-cost} once optimality is established.
+
+For a policy $a$, introduce
+\[
+ J_\theta(a)=c_{P_\theta}(a)+2r_{P_\theta}(a)
+ =\E_\theta[1+a(S)(2m_\theta(S)-1)].
+\]
+The policy \eqref{eq:comparator} minimizes the integrand at every support
+point: it releases below error $1/2$, reveals above $1/2$, and may mix
+at equality. For any feasible $a$,
+\[
+ c_{P_\theta}(a)
+ =J_\theta(a)-2r_{P_\theta}(a)
+ \ge J_\theta(a^\star_\theta)-\frac12
+ =c_{P_\theta}(a^\star_\theta),
+\]
+proving optimality.
+
+Because the action precedes the label and the stream is i.i.d.,
+\[
+ \E_\theta[I_t+2R_t\mid\calH_{t-1},S_t,A_t]
+ =I_t+2(1-I_t)m_\theta(S_t).
+\]
+The comparator's expected total objective is
+$TJ_\theta(a^\star_\theta)=C^\star_{\theta,T}+T/2$.
+Hence $\Delta_\theta$ is the learner's excess expected objective over
+this pointwise minimum. At cell $i$, revealing when $\theta_i=-1$
+or releasing when $\theta_i=+1$ incurs excess $2\beta$.
+The excess is zero at the boundary and nonnegative at the anchor.
+Summing and discarding the anchor excess gives \eqref{eq:decomposition}.
+\end{proof}
+
+\subsection{Indistinguishability and adaptive decisions}
+
+For probability laws $P,Q$, write $\KL(P\|Q)$ for relative entropy
+with natural logarithms, and $\TV(P,Q)=\sup_B|P(B)-Q(B)|$.
+Fix a coordinate $i$ and all other signs. Denote the two resulting
+instances by $\theta^-$ and $\theta^+$, according to the sign of
+coordinate $i$.
+
+\begin{lemma}[Information bound]
+\label{lem:information}
+For every fixed learner and every $t\le T$, the laws $\nu_t^-$ and
+$\nu_t^+$ of $\calH_{t-1}$ under the paired instances satisfy
+\begin{equation}
+ \KL(\nu_t^-\|\nu_t^+)<\frac1{100},\qquad
+ \TV(\nu_t^-,\nu_t^+)<\frac14.
+ \label{eq:information}
+\end{equation}
+The same bounds hold for the complete observable interaction.
+\end{lemma}
+\begin{proof}
+For $p,q\in(0,1)$, $\log x\le x-1$ implies
+\begin{equation}
+ \KL(\Ber(p)\|\Ber(q))
+ \le\frac{(p-q)^2}{q(1-q)}.
+ \label{eq:bernoulli-kl}
+\end{equation}
+The paired laws differ only at $s_i$ and the anchor. At $s_i$ their
+means differ by $2\beta$, and $q(1-q)=1/4-\beta^2>4/17$,
+so the conditional divergence is at most $17\beta^2$.
+At the anchor the difference is $2\beta/M$, and
+\[
+ q\in[23/192,25/192],\qquad
+ q(1-q)\ge\frac{23\cdot169}{192^2}>\frac1{10}.
+\]
+Its conditional divergence is therefore at most $40\beta^2/M^2$.
+
+Consider the full latent sample $(S_t,Y_t)_{t=1}^T$, including labels
+never revealed to the learner, and denote its law by $Q_\theta$.
+The common score marginal and product additivity give
+\begin{align}
+ \KL(Q_{\theta^-}\|Q_{\theta^+})
+ &\le T\left(\frac{17\beta^2}{4M}
+                    +\frac{10\beta^2}{M^2}\right)\notag\\
+ &\le T\beta^2\left(\frac{17}{4M}+\frac{40}{M^2}\right)\notag\\
+ &<\frac{M+1}{4096}\left(\frac{17}{4M}+\frac{40}{M^2}\right)
+ \le\frac{291}{32768}<\frac1{100}.
+ \label{eq:latent-kl}
+\end{align}
+Here $T<(M+1)^3$, and, for $M\ge2$,
+\[
+ (M+1)\left(\frac{17}{4M}+\frac{40}{M^2}\right)
+ =\frac{17}{4}+\frac{177}{4M}+\frac{40}{M^2}
+ \le\frac{291}{8}.
+\]
+The learner's random seed is independent of this sample and has the same
+law under both instances. Every observable history, and the entire
+interaction, is a common randomized transformation of the latent sample.
+Data processing transfers \eqref{eq:latent-kl} to these laws.
+Pinsker's inequality then gives
+$\TV\le\sqrt{\KL/2}<1/\sqrt{200}<1/4$.
+\end{proof}
+
+\begin{lemma}[Paired action errors]
+\label{lem:testing}
+For every paired $\theta^-,\theta^+$,
+\begin{equation}
+ \E_{\theta^-}\sum_{t=1}^T\ind\{S_t=s_i\}I_t
+ +\E_{\theta^+}\sum_{t=1}^T\ind\{S_t=s_i\}(1-I_t)
+ \ge\frac{3T}{16M}.
+ \label{eq:paired-errors}
+\end{equation}
+\end{lemma}
+\begin{proof}
+Let $k_{t,i}(h)\in[0,1]$ be the learner's probability of revealing at
+score $s_i$ given history $h$, integrating over its fresh randomness.
+This is a common kernel under the two instances. Put
+$q_t^\pm=\int k_{t,i}\,d\nu_t^\pm$. By Lemma~\ref{lem:information},
+\[
+ |q_t^--q_t^+|\le\TV(\nu_t^-,\nu_t^+)<\frac14,
+ \qquad q_t^-+1-q_t^+\ge\frac34.
+\]
+Under each instance, $S_t$ is independent of the pre-score history
+and $\Pp(S_t=s_i)=1/(4M)$. Thus the left side of
+\eqref{eq:paired-errors} equals
+\[
+ \frac1{4M}\sum_{t=1}^T(q_t^-+1-q_t^+)
+ \ge\frac{3T}{16M}.
+\]
+Comparing histories \emph{before} the current score arrives is essential:
+no conditioning of a joint total-variation bound on a rare score event
+is used.
+\end{proof}
+
+\subsection{Completion of the lower-bound proof}
+
+\begin{proof}[Proof of Theorem~\ref{thm:main}]
+Lemma~\ref{lem:family} establishes admissibility, and
+Lemma~\ref{lem:comparator} supplies the binding optimal comparator.
+For each coordinate $i$, partition $\Theta_T$ into the $2^{M-1}$
+pairs differing only at $i$. Lemma~\ref{lem:testing} gives
+\[
+ \frac1{2^M}\sum_{\theta\in\Theta_T}\E_\theta W_i
+ \ge\frac{2^{M-1}}{2^M}\frac{3T}{16M}
+ =\frac{3T}{32M}.
+\]
+Using \eqref{eq:decomposition} and summing over $i$,
+\[
+ \max_\theta\Delta_\theta
+ \ge\frac1{2^M}\sum_\theta\Delta_\theta
+ \ge2\beta\frac{3T}{32}
+ =\frac{3T}{1024(M+1)}.
+\]
+Since $T^{1/3}\ge2$ and $M+1\le T^{1/3}+1\le(3/2)T^{1/3}$,
+the last quantity is at least $T^{2/3}/512$, which is stronger than
+the stated $T^{2/3}/2048$. This proves \eqref{eq:main}.
+\end{proof}
+
+\begin{thebibliography}{9}
+\bibitem{paclabels}
+E. J. Cand\`es, A. Ilyas, and T. Zrnic.
+\emph{Probably Approximately Correct Labels}.
+arXiv:2506.10908, 2025.
+\url{https://arxiv.org/abs/2506.10908}.
+
+\bibitem{defer}
+H. Mozannar and D. Sontag.
+Consistent estimators for learning to defer to an expert.
+\emph{Proceedings of Machine Learning Research}, 119:7076--7087, 2020.
+\url{https://proceedings.mlr.press/v119/mozannar20b.html}.
+
+\bibitem{partial}
+N. Cesa-Bianchi, G. Lugosi, and G. Stoltz.
+Regret minimization under partial monitoring.
+\emph{Mathematics of Operations Research}, 31(3):562--580, 2006.
+\url{https://doi.org/10.1287/moor.1060.0206}.
+
+\bibitem{stochastic}
+H. Yu, M. J. Neely, and X. Wei.
+Online convex optimization with stochastic constraints.
+\emph{Advances in Neural Information Processing Systems}, 30, 2017.
+\url{https://papers.nips.cc/paper/2017/hash/da0d1111d2dc5d489242e60ebcbaf988-Abstract.html}.
+
+\bibitem{barrier}
+C.-Y. Wei and H. Luo.
+More adaptive algorithms for adversarial bandits.
+\emph{Proceedings of Machine Learning Research}, 75:1263--1291, 2018.
+\url{https://proceedings.mlr.press/v75/wei18a.html}.
+
+\bibitem{adagrad}
+J. Duchi, E. Hazan, and Y. Singer.
+Adaptive subgradient methods for online learning and stochastic optimization.
+\emph{Journal of Machine Learning Research}, 12(61):2121--2159, 2011.
+\url{https://jmlr.org/papers/v12/duchi11a.html}.
+\end{thebibliography}
+
+\end{document}
